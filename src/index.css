@@ -1,0 +1,97 @@
+/* ── Cottage Con — Global Styles ─────────────────────────────────────── */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #0D1117;
+  color: #F0F4FF;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Prevent horizontal scroll on mobile */
+  overflow-x: hidden;
+  /* iOS momentum scrolling */
+  -webkit-overflow-scrolling: touch;
+}
+
+#root {
+  width: 100%;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+/* ── Safe area / notch support ─────────────────────────────────────── */
+body {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* ── Scrollbar styling (desktop) ───────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #0D1117; }
+::-webkit-scrollbar-thumb { background: #2E3D5E; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #4A5B78; }
+
+/* ── Animations ────────────────────────────────────────────────────── */
+@keyframes ccSpin {
+  to { transform: rotate(360deg); }
+}
+@keyframes ccFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes ccPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+/* ── Responsive nav: desktop vs mobile ─────────────────────────────── */
+
+/* Default: hide both — CSS controls all visibility, no inline display overrides */
+.cc-desktop-tabs { display: none !important; }
+.cc-hamburger    { display: none !important; }
+.cc-live         { display: none !important; }
+
+/* Desktop (≥ 700px): show tab row, hide hamburger */
+@media (min-width: 700px) {
+  .cc-desktop-tabs { display: flex !important; align-items: center; }
+  .cc-hamburger    { display: none !important; }
+  .cc-live         { display: inline-flex !important; }
+}
+
+/* Mobile (< 700px): hide tab row, show hamburger */
+@media (max-width: 699px) {
+  .cc-desktop-tabs { display: none !important; }
+  .cc-hamburger    { display: flex !important; align-items: center; justify-content: center; }
+  .cc-live         { display: none !important; }
+}
+
+/* ── Prevent content overflow ───────────────────────────────────────── */
+img, video, svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Inputs / selects inherit font */
+input, select, textarea, button {
+  font-family: inherit;
+}
+
+/* Remove default tap highlight on mobile */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Focus visible ring (accessibility) */
+:focus-visible {
+  outline: 2px solid #D4A72C;
+  outline-offset: 2px;
+}

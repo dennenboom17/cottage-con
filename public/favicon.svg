@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+  <defs>
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#263450"/>
+      <stop offset="100%" stop-color="#0D1117"/>
+    </radialGradient>
+    <radialGradient id="gearGrad" cx="40%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#F5C842"/>
+      <stop offset="60%" stop-color="#D4A72C"/>
+      <stop offset="100%" stop-color="#A07818"/>
+    </radialGradient>
+    <radialGradient id="innerGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1E2840"/>
+      <stop offset="100%" stop-color="#161C2B"/>
+    </radialGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="24" cy="24" r="23" fill="url(#bgGrad)" stroke="#2E3D5E" stroke-width="1"/>
+
+  <!-- Gear body (12-tooth gear) -->
+  <g transform="translate(24,24)" filter="url(#glow)">
+    <path d="
+      M-5,-15 L-3,-13 L3,-13 L5,-15
+      L9,-13 L9,-11 L13,-9 L15,-11
+      L15,-7 L13,-5 L13,5 L15,7
+      L15,11 L13,13 L9,11 L9,13
+      L5,15 L3,13 L-3,13 L-5,15
+      L-9,13 L-9,11 L-13,9 L-15,11
+      L-15,7 L-13,5 L-13,-5 L-15,-7
+      L-15,-11 L-13,-13 L-9,-11 L-9,-13
+      Z
+    " fill="url(#gearGrad)" stroke="#A07818" stroke-width="0.5" stroke-linejoin="round"/>
+
+    <!-- Inner hub circle -->
+    <circle r="6.5" fill="url(#innerGrad)" stroke="#D4A72C" stroke-width="1.2"/>
+
+    <!-- Centre rivet / bolt -->
+    <circle r="2.5" fill="#D4A72C" opacity="0.9"/>
+    <circle r="1.2" fill="#F5C842"/>
+
+    <!-- Spokes / cross detail on inner ring -->
+    <line x1="0" y1="-6" x2="0" y2="6" stroke="#D4A72C" stroke-width="0.6" opacity="0.5"/>
+    <line x1="-6" y1="0" x2="6" y2="0" stroke="#D4A72C" stroke-width="0.6" opacity="0.5"/>
+  </g>
+
+  <!-- Small accent gear top-right -->
+  <g transform="translate(35,13) scale(0.55)">
+    <path d="
+      M-3,-9 L-1.5,-7.5 L1.5,-7.5 L3,-9
+      L5.5,-7.5 L5.5,-5.5 L7.5,-3 L9,-5
+      L9,-1 L7.5,1 L7.5,3 L9,5
+      L5.5,5 L5.5,7.5 L3,9 L1.5,7.5
+      L-1.5,7.5 L-3,9 L-5.5,7.5 L-5.5,5
+      L-7.5,3 L-9,5 L-9,1 L-7.5,-1
+      L-7.5,-3 L-9,-5 L-5.5,-5.5 L-5.5,-7.5
+      Z
+    " fill="#C07840" stroke="#8B5A20" stroke-width="0.5"/>
+    <circle r="3" fill="#161C2B" stroke="#C07840" stroke-width="0.8"/>
+    <circle r="1.2" fill="#C07840" opacity="0.8"/>
+  </g>
+
+  <!-- Steam puff accent (top-left area) -->
+  <ellipse cx="11" cy="10" rx="5" ry="3" fill="#93C5FD" opacity="0.18"/>
+  <ellipse cx="9" cy="8" rx="3.5" ry="2" fill="#93C5FD" opacity="0.12"/>
+
+  <!-- Outer ring glow hint -->
+  <circle cx="24" cy="24" r="22.5" fill="none" stroke="#D4A72C" stroke-width="0.4" opacity="0.3"/>
+</svg>

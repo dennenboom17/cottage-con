@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#263450"/>
+      <stop offset="70%" stop-color="#161C2B"/>
+      <stop offset="100%" stop-color="#0D1117"/>
+    </radialGradient>
+    <radialGradient id="gearGrad" cx="38%" cy="32%" r="65%">
+      <stop offset="0%" stop-color="#F5C842"/>
+      <stop offset="55%" stop-color="#D4A72C"/>
+      <stop offset="100%" stop-color="#9A6C10"/>
+    </radialGradient>
+    <radialGradient id="innerRingGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#2E3D5E"/>
+      <stop offset="100%" stop-color="#1E2840"/>
+    </radialGradient>
+    <radialGradient id="diceGrad" cx="40%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#1E2840"/>
+      <stop offset="100%" stop-color="#0D1117"/>
+    </radialGradient>
+    <radialGradient id="pipGrad" cx="40%" cy="30%" r="60%">
+      <stop offset="0%" stop-color="#F5C842"/>
+      <stop offset="100%" stop-color="#C07840"/>
+    </radialGradient>
+    <filter id="gearGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="pipGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="innerShadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="3" stdDeviation="8" flood-color="#000" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+
+  <!-- Background circle with deep navy -->
+  <circle cx="256" cy="256" r="248" fill="url(#bgGrad)"/>
+  <!-- Subtle outer border -->
+  <circle cx="256" cy="256" r="247" fill="none" stroke="#D4A72C" stroke-width="3" opacity="0.4"/>
+
+  <!-- GEAR: 16 teeth around outer ring -->
+  <g filter="url(#gearGlow)">
+    <!-- Outer gear ring -->
+    <circle cx="256" cy="256" r="218" fill="none" stroke="url(#gearGrad)" stroke-width="28"/>
+
+    <!-- Gear teeth (16 teeth) -->
+    <g fill="url(#gearGrad)">
+      <rect x="242" y="16" width="28" height="52" rx="8" transform="rotate(0,256,256)"/>
+      <rect x="242" y="16" width="28" height="52" rx="8" transform="rotate(22.5,256,256)"/>
+      <rect x="242" y="16" width="28" height="52" rx="8" transform="rotate(45,256,256)"/>
+      <rect x="242" y="16" width="28" height="52" rx="8" transform="rotate(67.5,256,256)"/>
+      <rect x="242" y="16" width="28" height="52" rx="8" transform="rotate(90,256,256)"/>
+      <rect x="242" y="16" width="28" height="52" rx="8" transform="rotate(112.5,256,256)"/>
+      <rect x="242" y="16" width="28" height="52" rx="8" transform="rotate(135,256,256)"/>
+      <rect x="242" y="16" width="28" height="52" rx="8" transform="rotate(157.5,256,256)"/>
+      <rect x="242" y="16" width="28" height="52" rx="8" transform="rotate(180,256,256)"/>
+      <rect x="242" y="16" width="28" height="52" rx="8" transform="rotate(202.5,256,256)"/>
+      <rect x="242" y="16" width="28" height="52" rx="8" transform="rotate(225,256,256)"/>
+      <rect x="242" y="16" width="28" height="52" rx="8" transform="rotate(247.5,256,256)"/>
+      <rect x="242" y="16" width="28" height="52" rx="8" transform="rotate(270,256,256)"/>
+      <rect x="242" y="16" width="28" height="52" rx="8" transform="rotate(292.5,256,256)"/>
+      <rect x="242" y="16" width="28" height="52" rx="8" transform="rotate(315,256,256)"/>
+      <rect x="242" y="16" width="28" height="52" rx="8" transform="rotate(337.5,256,256)"/>
+    </g>
+  </g>
+
+  <!-- Inner hub dark circle -->
+  <circle cx="256" cy="256" r="176" fill="url(#innerRingGrad)" filter="url(#innerShadow)"/>
+  <!-- Inner ring accent -->
+  <circle cx="256" cy="256" r="176" fill="none" stroke="#D4A72C" stroke-width="3" opacity="0.5"/>
+  <circle cx="256" cy="256" r="162" fill="none" stroke="#2E3D5E" stroke-width="1.5" opacity="0.6"/>
+
+  <!-- DICE: rounded square with amber border -->
+  <rect x="128" y="128" width="256" height="256" rx="48"
+    fill="url(#diceGrad)"
+    stroke="#D4A72C" stroke-width="10"
+    filter="url(#innerShadow)"/>
+
+  <!-- Inner dice bevel line -->
+  <rect x="142" y="142" width="228" height="228" rx="38"
+    fill="none" stroke="#D4A72C" stroke-width="2.5" opacity="0.3"/>
+
+  <!-- PIPS: 5-die layout (like standard die showing 5) -->
+  <!-- Top-left -->
+  <circle cx="186" cy="186" r="26" fill="url(#pipGrad)" filter="url(#pipGlow)"/>
+  <!-- Top-right -->
+  <circle cx="326" cy="186" r="26" fill="url(#pipGrad)" filter="url(#pipGlow)"/>
+  <!-- Center -->
+  <circle cx="256" cy="256" r="26" fill="url(#pipGrad)" filter="url(#pipGlow)"/>
+  <!-- Bottom-left -->
+  <circle cx="186" cy="326" r="26" fill="url(#pipGrad)" filter="url(#pipGlow)"/>
+  <!-- Bottom-right -->
+  <circle cx="326" cy="326" r="26" fill="url(#pipGrad)" filter="url(#pipGlow)"/>
+
+  <!-- Subtle steam accent top-left of bg -->
+  <ellipse cx="100" cy="90" rx="52" ry="28" fill="#93C5FD" opacity="0.08"/>
+  <ellipse cx="78" cy="72" rx="36" ry="18" fill="#93C5FD" opacity="0.06"/>
+</svg>
