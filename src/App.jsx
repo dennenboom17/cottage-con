@@ -12,6 +12,9 @@ import {
 import {
   getMessaging, getToken, onMessage, isSupported as messagingSupported,
 } from "firebase/messaging";
+import {
+  parseBggIndexDoc, createBggMatcher, buildBggIndex, bggIndexDoc, bggGameUrl, bggSearchUrl,
+} from "./bggIndex.js";
 // firebase/ai SDK removed — using direct Gemini REST API to avoid App Check requirement
 // Note: firebase/in-app-messaging not in firebase@10 modular SDK — handled via onMessage + toast below
 
@@ -944,24 +947,50 @@ function usePushNotifications(authUser, profile, doUpdateProfile, showToast){
 }
 
 
-// ── BGG API lookup via CORS proxy ────────────────────────────────────────────
+// ── BGG lookup ────────────────────────────────────────────────────────────────
+// Game IDs come from the BGG ranks index stored in Firestore (bggIndex/current, published from the
+// Engine Room → BGG Index tab), NOT from Gemini's memory. Gemini is only asked for the details
+// the index doesn't have (player counts, weight, blurb).
+let _bggMatcherPromise = null;
+export const resetBggMatcher = () => { _bggMatcherPromise = null; };
 
+// Loads the index once per page. Resolves to a matcher, or null when no index is published / readable
+// (callers then fall back to the old Gemini-only lookup).
+export function getBggMatcher() {
+  if(!_bggMatcherPromise){
+    _bggMatcherPromise = (async () => {
+      try {
+        const snap = await getDoc(doc(db, "bggIndex", "current"));
+        const rows = snap.exists() ? parseBggIndexDoc(snap.data()) : null;
+        return rows ? createBggMatcher(rows) : null;
+      } catch(e) {
+        console.warn("[BGG index] unavailable:", e?.code || e?.message);
+        _bggMatcherPromise = null; // allow a retry on the next lookup
+        return null;
+      }
+    })();
+  }
+  return _bggMatcherPromise;
+}
 
+// Replaces the published index (full overwrite, not a merge) and drops the cached matcher.
+export async function saveBggIndex(payload) {
+  await setDoc(doc(db, "bggIndex", "current"), payload);
+  resetBggMatcher();
+}
 
-export async function lookupBGG(gameName) {
-  // Use Gemini to look up BGG data — avoids CORS issues with direct BGG API calls
-  if(!gameName?.trim()) return null;
-  const cleanedName = gameName
-    .replace(/\s+MINP.*$/i,"").replace(/\s+MAXP.*$/i,"")
-    .replace(/\s+\d+[-\u2013]\d+.*/i,"").trim();
-  console.log("[BGG via Gemini] Looking up:", cleanedName);
+const BGG_BLANK = { name:"", minPlayers:"", maxPlayers:"", minPlaytime:"", maxPlaytime:"", weight:"", rating:"", year:"", description:"" };
+
+// Asks Gemini for the details the index lacks. Returns null on any failure.
+async function fetchBggDetails(title, yearHint) {
+  console.log("[BGG via Gemini] Looking up:", title);
   try {
     const res = await fetch(GEMINI_URL, {
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body: JSON.stringify({
         contents:[{ role:"user", parts:[{ text:
-          `For the board game "${cleanedName}", provide the following information from BoardGameGeek. Reply ONLY in this exact format with no extra text:
+          `For the board game "${title}"${yearHint ? ` (${yearHint})` : ""}, provide the following information from BoardGameGeek. Reply ONLY in this exact format with no extra text:
 NAME: <official game name>
 MINP: <minimum players number>
 MAXP: <maximum players number>
@@ -984,13 +1013,12 @@ If you don't know the BGG ID, put 0.` }]}],
     // Response may have multiple parts when search grounding is used — concatenate all text
     const parts = data?.candidates?.[0]?.content?.parts || [];
     const text  = parts.map(p=>p.text||"").join("").trim();
-    console.log("[BGG via Gemini + Search] Raw response:", text.slice(0,300));
+    console.log("[BGG via Gemini] Raw response:", text.slice(0,300));
 
     const get = (key) => text.match(new RegExp(key + ":\\s*(.+)", "i"))?.[1]?.trim() || "";
-    const bggId = get("BGG_ID").replace(/\D/g,"");
-    const name  = get("NAME");
+    const name = get("NAME");
     if(!name) return null;
-
+    const remembered = get("BGG_ID").replace(/\D/g,"");
     return {
       name,
       minPlayers:  get("MINP"),
@@ -1001,9 +1029,7 @@ If you don't know the BGG ID, put 0.` }]}],
       rating:      get("RATING"),
       year:        get("YEAR"),
       description: get("DESC"),
-      bggUrl: bggId && bggId !== "0"
-        ? `https://boardgamegeek.com/boardgame/${bggId}`
-        : `https://boardgamegeek.com/search/boardgame?q=${encodeURIComponent(cleanedName)}`,
+      rememberedId: remembered && remembered !== "0" ? Number(remembered) : null, // the model's recollection — unreliable
     };
   } catch(e) {
     console.warn("[BGG via Gemini] failed:", e.message);
@@ -1011,7 +1037,42 @@ If you don't know the BGG ID, put 0.` }]}],
   }
 }
 
+// lookupBGG(name)        → resolve a name against the index (exact match pins a real BGG id)
+// lookupBGG(name, game)  → `game` is a candidate the user picked from the index; skip matching
+// Result: the usual detail fields plus { bggUrl, bggId, source: "index"|"search"|"gemini", candidates }.
+//   source "index"  : exact index match — bggUrl is the game's real page; name/year/rating come from BGG's data
+//   source "search" : index loaded but no exact match — bggUrl is a BGG search link; `candidates` are close titles to offer
+//   source "gemini" : no index published — legacy behaviour using the model's remembered id
+export async function lookupBGG(gameName, known) {
+  if(!gameName?.trim()) return null;
+  const cleanedName = gameName
+    .replace(/\s+MINP.*$/i,"").replace(/\s+MAXP.*$/i,"")
+    .replace(/\s+\d+[-–]\d+.*/i,"").trim();
 
+  const matcher = known ? null : await getBggMatcher();
+  const found   = matcher ? matcher.find(cleanedName) : null;
+  const ref     = known || (found?.status === "exact" ? found.match : null);
+
+  const details = await fetchBggDetails(ref?.name || cleanedName, ref?.year || "");
+
+  if(ref){
+    const { rememberedId, ...rest } = details || {};
+    return { ...BGG_BLANK, ...rest, name: ref.name, rating: String(ref.rating || ""), year: String(ref.year || ""),
+      bggId: ref.id, bggUrl: bggGameUrl(ref.id), source: "index", candidates: [] };
+  }
+  if(matcher){ // index loaded, no exact match: never trust the model's remembered id
+    const candidates = found.candidates;
+    if(!details && !candidates.length) return null;
+    const { rememberedId, ...rest } = details || {};
+    // keep the user's own spelling — an unconfirmed title shouldn't be silently renamed by the model
+    return { ...BGG_BLANK, ...rest, name: cleanedName, bggId: null,
+      bggUrl: bggSearchUrl(cleanedName), source: "search", candidates };
+  }
+  if(!details) return null;
+  const { rememberedId, ...rest } = details;
+  return { ...rest, bggId: rememberedId, bggUrl: rememberedId ? bggGameUrl(rememberedId) : bggSearchUrl(cleanedName),
+    source: "gemini", candidates: [] };
+}
 
 // Determine category from BGG weight + player counts
 // Rules: 2-player only → "2 Player", maxPlayers > 6 → "Party"
@@ -1997,34 +2058,52 @@ export function GameChest({ctx}){
 
   const bggUrl = name => name ? `https://boardgamegeek.com/search/boardgame?q=${encodeURIComponent(name)}` : "";
   const [lookingUp, setLookingUp] = useState(false);
+  const [bggCandidates, setBggCandidates] = useState([]); // close BGG titles offered when there is no exact match
   const [openRows, setOpenRows] = useState({}); // expanded game rows, keyed by game id
   const addFormRef = useRef(null);
   const nameInputRef = useRef(null);
 
   // On name blur — auto-lookup BGG to get exact URL + description + player counts
+  // Fill the add-game form from a lookup result. Never overwrites player counts the user already typed.
+  const applyBggToForm = (bggData) => {
+    const autoDesc = decodeHtml(decodeHtml(bggData.description||"")).slice(0,200);
+    console.log("[autoBGG] name:", bggData.name, "| weight:", bggData.weight, "| url:", bggData.bggUrl);
+    // Resolve player counts from the latest form state (not the render this lookup started in)
+    setForm(f=>{
+      const resolvedMinP = f.minP || bggData.minPlayers;
+      const resolvedMaxP = f.maxP || bggData.maxPlayers;
+      return {...f,
+        name:          (bggData.source==="index" ? bggData.name : cleanGameName(bggData.name)) || f.name,
+        bggUrlOverride: bggData.bggUrl,
+        minP:          resolvedMinP,
+        maxP:          resolvedMaxP,
+        desc:          autoDesc || f.desc,
+        category:      f.category || detectCategory(bggData.weight, resolvedMinP, resolvedMaxP),
+      };
+    });
+    setBggCandidates(bggData.candidates || []);
+    showToast(bggData.source==="search" && bggData.candidates?.length
+      ? `⚠️ No exact BGG match for "${bggData.name}" — pick a suggestion below`
+      : `✓ BGG: ${bggData.name} (${bggData.rating}/10)`);
+  };
+
   const autoBGG = async (name) => {
     if(!name.trim() || form.bggUrlOverride) return; // skip if already have exact URL
     setLookingUp(true);
     try {
       const bggData = await lookupBGG(name.trim());
-      if(bggData){
-        const autoDesc = decodeHtml(decodeHtml(bggData.description||"")).slice(0,200);
-        console.log("[autoBGG] name:", bggData.name, "| weight:", bggData.weight, "| url:", bggData.bggUrl);
-        // Resolve player counts from the latest form state (not the render this lookup started in)
-        setForm(f=>{
-          const resolvedMinP = f.minP || bggData.minPlayers;
-          const resolvedMaxP = f.maxP || bggData.maxPlayers;
-          return {...f,
-            name:          cleanGameName(bggData.name) || f.name,
-            bggUrlOverride: bggData.bggUrl,
-            minP:          resolvedMinP,
-            maxP:          resolvedMaxP,
-            desc:          autoDesc || f.desc,
-            category:      f.category || detectCategory(bggData.weight, resolvedMinP, resolvedMaxP),
-          };
-        });
-        showToast(`✓ BGG: ${bggData.name} (${bggData.rating}/10)`);
-      }
+      if(bggData) applyBggToForm(bggData);
+    } catch(e){ /* silent */ }
+    setLookingUp(false);
+  };
+
+  // The user picked one of the suggested BGG titles
+  const pickBggCandidate = async (candidate) => {
+    setBggCandidates([]);
+    setLookingUp(true);
+    try {
+      const bggData = await lookupBGG(candidate.name, candidate);
+      if(bggData) applyBggToForm(bggData);
     } catch(e){ /* silent */ }
     setLookingUp(false);
   };
@@ -2073,8 +2152,9 @@ export function GameChest({ctx}){
       // Now look up BGG for the exact URL and confirm details
       showToast("📸 Game identified! Looking up BGG details…");
       const bggData = await lookupBGG(gameName);
+      setBggCandidates(bggData?.candidates || []);
       if(bggData){
-        const cleanBggName = cleanGameName(bggData.name || gameName);
+        const cleanBggName = bggData.source==="index" ? bggData.name : cleanGameName(bggData.name || gameName);
         const cleanedDesc = bggData.description
           ? decodeHtml(decodeHtml(bggData.description)).slice(0, 200)
           : "";
@@ -2091,7 +2171,9 @@ export function GameChest({ctx}){
         }));
         if(autoCategory) console.log("[Scan] Auto-category:", autoCategory, "(weight:", bggData.weight, ")");
         console.log("[Scan] name:", cleanBggName, "| desc:", cleanedDesc.slice(0,60), "| url:", bggData.bggUrl);
-        showToast(`✓ Found on BGG: ${bggData.name} (${bggData.rating}/10)`);
+        showToast(bggData.source==="search" && bggData.candidates?.length
+          ? `⚠️ No exact BGG match for "${gameName}" — pick a suggestion below`
+          : `✓ Found on BGG: ${bggData.name} (${bggData.rating}/10)`);
       } else {
         showToast(`✓ Identified: ${gameName} — no BGG match found`);
       }
@@ -2102,10 +2184,10 @@ export function GameChest({ctx}){
     setScanning(false);
   };
 
-  const openAdd  = () => { setForm({name:"",minP:"",maxP:"",category:"",bggUrlOverride:"",desc:""}); setEditGame(null); setShowAdd(true); setShowReq(false); setScanErr(""); };
+  const openAdd  = () => { setBggCandidates([]); setForm({name:"",minP:"",maxP:"",category:"",bggUrlOverride:"",desc:""}); setEditGame(null); setShowAdd(true); setShowReq(false); setScanErr(""); };
   const openEdit = g => {
     setForm({name:g.name,minP:g.minPlayers||"",maxP:g.maxPlayers||"",category:g.category||"",bggUrlOverride:g.bggUrl||"",desc:g.description||""});
-    setEditGame(g); setShowAdd(true); setShowReq(false); setScanErr("");
+    setBggCandidates([]); setEditGame(g); setShowAdd(true); setShowReq(false); setScanErr("");
     setTimeout(()=>{
       addFormRef.current?.scrollIntoView({behavior:"smooth",block:"start"});
       setTimeout(()=>nameInputRef.current?.focus(),150);
@@ -2206,7 +2288,7 @@ export function GameChest({ctx}){
           <Inp label={lookingUp?"Game name * (looking up BGG…)":"Game name *"} placeholder="e.g. Wingspan"
             value={form.name}
             inputRef={nameInputRef}
-            onChange={e=>setForm(f=>({...f,name:e.target.value,bggUrlOverride:"",desc:""}))}
+            onChange={e=>{setBggCandidates([]);setForm(f=>({...f,name:e.target.value,bggUrlOverride:"",desc:""}));}}
             onBlur={e=>autoBGG(e.target.value)}
           />
           {lookingUp&&<div style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",
@@ -2214,6 +2296,13 @@ export function GameChest({ctx}){
             <span style={{display:"inline-block",animation:"ccSpin 1s linear infinite"}}>⚙️</span>
           </div>}
         </div>
+        {bggCandidates.length>0&&<div style={{gridColumn:"1/-1",display:"flex",flexWrap:"wrap",alignItems:"center",gap:6}}>
+          <span style={{fontSize:11,color:T.muted}}>No exact BGG match — did you mean:</span>
+          {bggCandidates.map(c=><button key={c.id} onClick={()=>pickBggCandidate(c)}
+            style={{fontFamily:"inherit",fontSize:12,padding:"4px 10px",borderRadius:4,cursor:"pointer",border:`1.5px solid ${T.steam}66`,background:T.steamSoft,color:T.steam}}>
+            {c.name}{c.year?` (${c.year})`:""}
+          </button>)}
+        </div>}
         {form.name.trim()&&<div style={{gridColumn:"1/-1",display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:T.amberSoft,border:`2px solid ${T.border2}`,borderRadius:6}}>
           <i className="ti ti-link" style={{color:T.amber,fontSize:13}}/>
           <a href={bggUrl(form.name.trim())} target="_blank" rel="noreferrer" style={{fontSize:12,color:T.amber,textDecoration:"none",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
@@ -3662,6 +3751,101 @@ export function Manifest({ctx}){
 }
 
 // ── Engine Room ───────────────────────────────────────────────────────────────
+// ── BGG Index (Engine Room) ───────────────────────────────────────────────────
+// Publishes BoardGameGeek's "boardgames_ranks.csv" data dump to Firestore (bggIndex/current) so game
+// scans resolve to real BGG IDs. The CSV is parsed in the browser and never leaves this device except
+// as the trimmed index (games with 500+ ratings, ~7,000 titles, ~300 KB).
+export function BggIndexManager({ctx}){
+  const {showToast}=ctx;
+  const [status,setStatus]=useState({state:"loading"});   // loading | none | ready | error
+  const [preview,setPreview]=useState(null);              // {index,fileName}: parsed locally, not yet published
+  const [busy,setBusy]=useState(false);
+  const [err,setErr]=useState("");
+
+  useEffect(()=>{
+    let alive=true;
+    getDoc(doc(db,"bggIndex","current"))
+      .then(snap=>{ if(alive) setStatus(snap.exists()?{state:"ready",meta:snap.data()}:{state:"none"}); })
+      .catch(e=>{ if(alive) setStatus({state:"error",msg:e?.code||e?.message||"unknown error"}); });
+    return()=>{ alive=false; };
+  },[]);
+
+  const onFile=async e=>{
+    const f=e.target.files?.[0];
+    if(!f) return;
+    setErr(""); setPreview(null);
+    if(/\.zip$/i.test(f.name)){ setErr("That's the zip — extract it first, then choose boardgames_ranks.csv."); return; }
+    try{
+      const text=await f.text();
+      setPreview({index:buildBggIndex(text),fileName:f.name});
+    }catch(ex){ setErr(ex.message||"Couldn't read that file."); }
+  };
+
+  const publish=async()=>{
+    setBusy(true); setErr("");
+    try{
+      const payload=bggIndexDoc(preview.index,{source:preview.fileName});
+      await saveBggIndex(payload);
+      const {games,...meta}=payload;
+      setStatus({state:"ready",meta});
+      setPreview(null);
+      showToast(`📚 BGG index published — ${payload.count.toLocaleString()} games`);
+    }catch(ex){
+      setErr(ex?.code==="permission-denied"
+        ?"Firestore denied the write. Add a security rule letting signed-in users read and write the bggIndex collection, then try again."
+        :(ex?.message||"Couldn't save the index."));
+    }
+    setBusy(false);
+  };
+
+  const meta=status.state==="ready"?status.meta:null;
+  const pill={fontSize:12,borderRadius:4,padding:"3px 10px",fontFamily:"'Cinzel',serif",fontWeight:700};
+  return(
+    <div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+        <h3 style={{fontFamily:"'Cinzel',serif",fontSize:13,color:T.amber}}>📚 BGG Game Index</h3>
+        {status.state==="ready"&&<span style={{...pill,color:"#4ADE80",background:"#162A1E",border:"1px solid #166534"}}>
+          {meta.count?.toLocaleString()} games
+        </span>}
+        {status.state==="none"&&<span style={{...pill,color:T.danger,background:"#1A0E0E",border:"1px solid #991B1B"}}>not published</span>}
+      </div>
+
+      <p style={{fontSize:12,color:T.muted,lineHeight:1.6,marginBottom:12}}>
+        When someone scans or adds a game, its name is looked up here to get the exact BoardGameGeek page.
+        Download the <strong>boardgames_ranks</strong> data dump from BoardGameGeek, extract the zip, and choose
+        <code> boardgames_ranks.csv</code>. Only games with 500+ ratings are kept.
+      </p>
+
+      {status.state==="loading"&&<p style={{fontSize:12,color:T.hint}}>Checking the current index…</p>}
+      {status.state==="error"&&<p role="alert" style={{fontSize:12,color:T.danger}}>
+        Couldn't read the index ({status.msg}). If this says permission-denied, add a Firestore rule for the bggIndex collection.
+      </p>}
+      {meta&&<p style={{fontSize:12,color:T.muted,marginBottom:12}}>
+        Current index: {meta.count?.toLocaleString()} games with {meta.minRatings}+ ratings
+        {meta.source?` · from ${meta.source}`:""}
+        {meta.updatedAt?` · published ${new Date(meta.updatedAt).toLocaleDateString("en-CA")}`:""}
+      </p>}
+
+      <input type="file" accept=".csv,text/csv" aria-label="BGG ranks CSV" onChange={onFile}
+        style={{fontSize:12,color:T.muted,marginBottom:12,maxWidth:"100%"}}/>
+
+      {preview&&<Card style={{background:T.surface,marginBottom:12}}>
+        <p style={{fontSize:13,color:T.text,marginBottom:10}}>
+          Ready to publish <strong>{preview.index.games.length.toLocaleString()}</strong> games
+          ({Math.round(preview.index.bytes/1024)} KB) from <strong>{preview.fileName}</strong>.
+          This replaces the current index.
+        </p>
+        <div style={{display:"flex",gap:8}}>
+          <Btn onClick={publish} disabled={busy}>{busy?"Publishing…":"Publish to Firestore"}</Btn>
+          <Btn variant="ghost" onClick={()=>setPreview(null)} disabled={busy}>Cancel</Btn>
+        </div>
+      </Card>}
+
+      {err&&<div role="alert" style={{fontSize:12,color:T.danger,background:T.dangerBg,padding:"8px 12px",borderRadius:6,border:`1px solid ${T.danger}44`,lineHeight:1.4}}>{err}</div>}
+    </div>
+  );
+}
+
 function EngineRoom({ctx}){
   const [tab,setTab]=useState("itinerary");
   const [unlocked,setUnlocked]=useState(false);
@@ -3687,7 +3871,7 @@ function EngineRoom({ctx}){
     <div className="cc-fade">
       <SectionTitle sub="Manage itinerary days and deck hand duties">Engine Room</SectionTitle>
       <div style={{display:"flex",gap:8,marginBottom:22,flexWrap:"wrap"}}>
-        {[["itinerary","🗓 Itinerary Days"],["deckslots","⚙️ Deck Hand Slots"],["deposits","💰 Deposits"],["ranks","⚓ Crew Ranks"],["notify","📨 Notify"],["costs","🧮 Cost Calculator"]].map(([id,label])=>(
+        {[["itinerary","🗓 Itinerary Days"],["deckslots","⚙️ Deck Hand Slots"],["deposits","💰 Deposits"],["ranks","⚓ Crew Ranks"],["notify","📨 Notify"],["costs","🧮 Cost Calculator"],["bgg","📚 BGG Index"]].map(([id,label])=>(
           <button key={id} onClick={()=>setTab(id)} style={{fontFamily:"'Cinzel',serif",fontSize:12,fontWeight:700,padding:"7px 16px",borderRadius:5,cursor:"pointer",border:`2px solid ${tab===id?T.amber:T.border}`,background:tab===id?T.amberSoft:"transparent",color:tab===id?T.amber:T.muted,transition:"all .15s"}}>{label}</button>
         ))}
       </div>
@@ -3697,6 +3881,7 @@ function EngineRoom({ctx}){
       {tab==="ranks"&&<CrewRankManager ctx={ctx}/>}
       {tab==="notify"&&<NotifyPanel ctx={ctx}/>}
       {tab==="costs"&&<CostCalculator ctx={ctx}/>}
+      {tab==="bgg"&&<BggIndexManager ctx={ctx}/>}
     </div>
   );
 }

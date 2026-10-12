@@ -112,6 +112,9 @@ describe('lookupBGG', () => {
       weight: '2.4', rating: '8.1', year: '2019',
       description: 'A bird-collecting engine builder.',
       bggUrl: 'https://boardgamegeek.com/boardgame/266192',
+      bggId: 266192,
+      source: 'gemini', // no index published → legacy lookup using the model's remembered id
+      candidates: [],
     })
   })
 

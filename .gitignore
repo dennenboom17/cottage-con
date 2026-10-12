@@ -25,3 +25,7 @@ dist-ssr
 
 # Firebase CLI deploy cache
 .firebase/
+
+# BGG data dump (licensed data - never commit the CSV/zip or a generated index)
+boardgames_ranks*
+bgg-index*
