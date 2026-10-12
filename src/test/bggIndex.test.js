@@ -197,3 +197,56 @@ describe.skipIf(!REAL || !fs.existsSync(REAL ?? ''))('real BGG dump', () => {
     for (const [name, id] of Object.entries(truth)) expect(m.find(name).match?.id, name).toBe(id)
   })
 })
+
+describe('matcher.exact', () => {
+  const m = createBggMatcher([[230802, 'Azul', 2017, 7.8, 80000], [3, 'The Castles of Burgundy', 2011, 8.1, 40000]])
+  it('returns the game for an exact title (case/punctuation-insensitive, "The" optional) and null otherwise', () => {
+    expect(m.exact('azul!')?.id).toBe(230802)
+    expect(m.exact('Castles of Burgundy')?.id).toBe(3)
+    expect(m.exact('Azur')).toBeNull() // no fuzzy matching here
+    expect(m.exact('')).toBeNull()
+  })
+})
+
+describe('matcher.findInText', () => {
+  const m = createBggMatcher([
+    [9209, 'Ticket to Ride', 2004, 7.4, 99733],
+    [14996, 'Ticket to Ride: Europe', 2005, 7.5, 60000],
+    [230802, 'Azul', 2017, 7.8, 80000],
+    [237182, 'Root', 2018, 8.0, 50000],
+    [1, 'Go', -2000, 7.6, 20000],
+    [2, 'Life', 1960, 5.0, 9000],
+    [3, 'The Castles of Burgundy', 2011, 8.1, 40000],
+    [13, 'Catan', 1995, 7.1, 144815],
+  ])
+  const ids = (text, limit) => m.findInText(text, limit).map((g) => g.id)
+
+  it('finds a title inside a question', () => {
+    expect(ids("What's the rating of Azul?")).toEqual([230802])
+  })
+  it('finds several titles, in the order they appear', () => {
+    expect(ids('Compare Catan and Azul please')).toEqual([13, 230802])
+    expect(ids('Azul or Catan?')).toEqual([230802, 13])
+  })
+  it('prefers the longest title and does not also report the shorter one inside it', () => {
+    expect(ids('Rules for Ticket to Ride Europe')).toEqual([14996])
+    expect(ids('Rules for Ticket to Ride')).toEqual([9209])
+  })
+  it('treats a leading "The" as optional', () => {
+    expect(ids('any tips for castles of burgundy?')).toEqual([3])
+  })
+  it('ignores very short or everyday single words', () => {
+    expect(ids("I'm going to play Go and have a life")).toEqual([]) // "go" < 4 letters, "life"/"play" are common words
+  })
+  it('still finds a short title when the 4+ letter rule is met', () => {
+    expect(ids('who has Root?')).toEqual([237182])
+  })
+  it('reports each game once and respects the limit', () => {
+    expect(ids('Azul azul AZUL')).toEqual([230802])
+    expect(ids('Azul Catan Root', 2)).toHaveLength(2)
+  })
+  it('returns nothing for empty or unrelated text', () => {
+    expect(ids('')).toEqual([])
+    expect(ids("what's for dinner tonight?")).toEqual([])
+  })
+})

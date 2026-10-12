@@ -127,6 +127,10 @@ function tokenScore(q, c) {
   return 0.5 * jaccard + 0.5 * containment
 }
 
+// Single words that are also game titles but far more often just English — never treated as a game on their own
+const COMMON_SINGLE_WORDS = new Set(['game', 'games', 'play', 'life', 'time', 'word', 'words', 'card', 'cards', 'dice', 'party', 'what', 'this', 'that', 'have', 'from', 'with', 'about', 'rule', 'rules', 'tonight', 'today'])
+const MAX_TITLE_TOKENS = 8
+
 const FUZZY_MIN_SCORE = 0.6
 const TYPO_MIN_SIMILARITY = 0.75
 
@@ -147,16 +151,53 @@ export function createBggMatcher(rows) {
     entries.push({ g, key, tokens: contentTokens(key) })
   }
 
+  // Exact title lookup (case/punctuation-insensitive; a leading "The" is optional). No fuzzy scan, so it is cheap.
+  const exactLookup = (name) => {
+    const key = normalizeName(name)
+    if (!key) return null
+    for (const k of [key, key.replace(/^the /, ''), `the ${key}`]) {
+      const hit = byKey.get(k)
+      if (hit) return hit
+    }
+    return null
+  }
+
   return {
     size: entries.length,
+    exact: exactLookup,
+
+    // Finds game titles mentioned inside free text (e.g. "what's the rating of Azul?"), in the order they appear.
+    // Longest title wins and matches never overlap, so "Ticket to Ride Europe" isn't also read as "Ticket to Ride".
+    // Single-word titles must be 4+ letters and not an everyday word. Returns up to `limit` games.
+    findInText(text, limit = 3) {
+      const tokens = normalizeName(text).split(' ').filter(Boolean)
+      const taken = new Array(tokens.length).fill(false)
+      const hits = []
+      for (let n = Math.min(MAX_TITLE_TOKENS, tokens.length); n >= 1; n--) {
+        for (let i = 0; i + n <= tokens.length; i++) {
+          if (taken.slice(i, i + n).some(Boolean)) continue
+          const phrase = tokens.slice(i, i + n).join(' ')
+          if (n === 1 && (phrase.length < 4 || STOP.has(phrase) || COMMON_SINGLE_WORDS.has(phrase))) continue
+          const game = byKey.get(phrase) || (n > 1 ? byKey.get(`the ${phrase}`) : undefined)
+          if (!game) continue
+          for (let k = i; k < i + n; k++) taken[k] = true
+          hits.push({ game, at: i })
+        }
+      }
+      const seen = new Set()
+      return hits
+        .sort((a, b) => a.at - b.at)
+        .map((h) => h.game)
+        .filter((g) => !seen.has(g.id) && seen.add(g.id))
+        .slice(0, limit)
+    },
+
     find(name, limit = 3) {
       const key = normalizeName(name)
       if (!key) return { status: 'none', match: null, candidates: [] }
 
-      for (const k of [key, key.replace(/^the /, ''), `the ${key}`]) {
-        const hit = byKey.get(k)
-        if (hit) return { status: 'exact', match: hit, candidates: [] }
-      }
+      const hit = exactLookup(name)
+      if (hit) return { status: 'exact', match: hit, candidates: [] }
 
       const q = contentTokens(key)
       const scored = new Map()

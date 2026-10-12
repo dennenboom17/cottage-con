@@ -13,7 +13,7 @@ import {
   getMessaging, getToken, onMessage, isSupported as messagingSupported,
 } from "firebase/messaging";
 import {
-  parseBggIndexDoc, createBggMatcher, buildBggIndex, bggIndexDoc, bggGameUrl, bggSearchUrl,
+  parseBggIndexDoc, createBggMatcher, buildBggIndex, bggIndexDoc, bggGameUrl, bggSearchUrl, normalizeName,
 } from "./bggIndex.js";
 // firebase/ai SDK removed — using direct Gemini REST API to avoid App Check requirement
 // Note: firebase/in-app-messaging not in firebase@10 modular SDK — handled via onMessage + toast below
@@ -39,7 +39,7 @@ const VAPID_KEY = "BG4bzfw0wSagiuRGNd2yk7n8y62Bgzk159rMQnairZjke2JEOmjfyB4NuZMWR
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 const GEMINI_MODEL   = "gemini-3.5-flash-lite";
 const GEMINI_URL     = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-const GEMINI_SYSTEM  = "You are the Cottage Con crew assistant. Cottage weekend: Nov 26-29 2026, Yellow Cottage, Alliston ON. You are a witty space pirate AI. Be brief and direct — 2-4 sentences max unless a list is genuinely needed. No filler phrases. STRICT TOPIC RULES: (0) Questions about how to add/edit/update anything in the app — answer ONLY from the APP INSTRUCTIONS section of the context. Never guess or invent navigation steps. (1) Questions about duties/help/slots/assignments — answer ONLY from DUTY ASSIGNMENTS and DECK HAND SLOTS sections. (2) Questions about food/meals/provisions/supplies — answer ONLY from FOOD BEING BROUGHT, GEAR & SUPPLIES, and MEAL PLAN sections. (3) Questions about people/crew/who — answer ONLY from the CREW section. (4) Questions about games — ONLY use games listed in the GAMES AVAILABLE (Cargo Hold) section of the context. NEVER use your training data for game suggestions. If no games are listed, say the Cargo Hold is empty. Never invent game names. EXCEPTION for rules questions: if someone asks how to play a specific game by name (even if not in the Cargo Hold), you MAY use your training knowledge to explain the rules — this is the only case where training data is allowed. IMPORTANT: Whenever you answer ANY question about games — recommendations, rules, voting, or anything game-related — you MUST end your response with the phrase: Tip: Do Not Trust Huss! Always. No exceptions. Use pirate flavour sparingly. Never apologise or over-explain.";
+const GEMINI_SYSTEM  = "You are the Cottage Con crew assistant. Cottage weekend: Nov 26-29 2026, Yellow Cottage, Alliston ON. You are a witty space pirate AI. Be brief and direct — 2-4 sentences max unless a list is genuinely needed. No filler phrases. STRICT TOPIC RULES: (0) Questions about how to add/edit/update anything in the app — answer ONLY from the APP INSTRUCTIONS section of the context. Never guess or invent navigation steps. (1) Questions about duties/help/slots/assignments — answer ONLY from DUTY ASSIGNMENTS and DECK HAND SLOTS sections. (2) Questions about food/meals/provisions/supplies — answer ONLY from FOOD BEING BROUGHT, GEAR & SUPPLIES, and MEAL PLAN sections. (3) Questions about people/crew/who — answer ONLY from the CREW section. (4) Questions about games — ONLY use games listed in the GAMES AVAILABLE (Cargo Hold) section of the context. NEVER use your training data for game suggestions. If no games are listed, say the Cargo Hold is empty. Never invent game names. EXCEPTION for rules questions: if someone asks how to play a specific game by name (even if not in the Cargo Hold), you MAY use your training knowledge to explain the rules — this is the only case where training data is allowed. IMPORTANT: Whenever you answer ANY question about games — recommendations, rules, voting, or anything game-related — you MUST end your response with the phrase: Tip: Do Not Trust Huss! Always. No exceptions. BGG LINKS & FACTS: a game's year, BoardGameGeek rating and BoardGameGeek link may ONLY come from a BOARDGAMEGEEK section or a 'BGG link' in the context. Whenever you discuss a specific game that has a verified BGG link in the context, include that exact link (paste the full URL, no markdown). Never invent, guess or alter a BoardGameGeek URL or ID. If there is no verified link and the user wants one, give the BGG search link from the context, or https://boardgamegeek.com/search/boardgame?q= followed by the URL-encoded game name. Use pirate flavour sparingly. Never apologise or over-explain.";
 
 export async function askGemini(prompt, history = []) {
   if(!GEMINI_API_KEY)
@@ -4697,6 +4697,64 @@ ONLY recommend games from the list above — never suggest games not in it. Reco
 }
 
 // ── Crew Assistant Chatbot ────────────────────────────────────────────────────
+// A title pulled out of a question can still carry lead-in words ("the rules for Azul"). Strip them so the
+// lookup and any BGG search link use the game's name only.
+export function cleanAskedTitle(s = "") {
+  let t = String(s).trim();
+  const LEAD = /^(?:(?:the|a|an|some)\s+)?(?:rules?|instructions?|directions?|details?|info(?:rmation)?|how\s+to\s+play|play(?:ing)?|explain(?:ing)?|teach(?:ing)?|about)\s+(?:(?:for|of|on|about|to)\s+)?/i;
+  for (let i = 0; i < 3 && LEAD.test(t); i++) t = t.replace(LEAD, "");
+  return t.replace(/^(?:the\s+game\s+|game\s+)/i, "").trim();
+}
+
+// ── Chat ↔ BoardGameGeek helpers ───────────────────────────────────────────────
+// Context block telling the chat model exactly which BoardGameGeek facts are VERIFIED for a game.
+// `result` is matcher.find(asked). Only index-backed data is ever presented as fact or given as a link.
+export function bggFactsBlock(result, asked) {
+  const search = bggSearchUrl(asked);
+  if(result.status === "exact"){
+    const g = result.match;
+    return `=== BOARDGAMEGEEK: "${g.name}" (verified in BGG's database) ===
+Year: ${g.year || "unknown"} | BGG average rating: ${g.rating}/10 from ${Number(g.ratings).toLocaleString("en-US")} ratings
+BGG link: ${bggGameUrl(g.id)}
+Include this exact BGG link when you answer about this game. Year and rating may only be stated as given here.`;
+  }
+  if(result.status === "fuzzy"){
+    return `=== BOARDGAMEGEEK: no exact match for "${asked}" ===
+Possible matches (NOT confirmed): ${result.candidates.map(c => `${c.name} (${c.year}) ${bggGameUrl(c.id)}`).join(" ; ")}
+Do not present any of these as the user's game unless it is clearly the one they mean; if unsure, ask which they mean. There is no verified link for "${asked}". BGG search link: ${search}`;
+  }
+  return `=== BOARDGAMEGEEK: "${asked}" was not found in BGG's list of ~7,000 well-rated games ===
+No verified link, year or rating is available. Do not invent a BGG URL, ID, year or rating. If asked for a link, give this search link: ${search}`;
+}
+
+// Used only when no BGG index has been published: model-remembered facts, clearly flagged, and a search link
+// (never a model-remembered game id, which is often wrong).
+export function legacyBggBlock(d, asked) {
+  const facts = [
+    d.minPlayers && d.maxPlayers && `Players: ${d.minPlayers}–${d.maxPlayers}`,
+    d.minPlaytime && `Playtime: ${d.minPlaytime} min`,
+    d.rating && `BGG rating: ${d.rating}/10`,
+    d.weight && `Complexity: ${d.weight}/5`,
+    d.year && `Year: ${d.year}`,
+  ].filter(Boolean);
+  const lines = [`=== BOARDGAMEGEEK (unverified, from model memory) FOR "${asked}" ===`];
+  if(facts.length) lines.push(facts.join(" | "));
+  if(d.description) lines.push(`Description: ${d.description}`);
+  lines.push(`BGG search link (the only BGG link to give): ${bggSearchUrl(asked)}`);
+  return lines.join("\n");
+}
+
+// Chat text with BoardGameGeek URLs made clickable. Other URLs stay plain text, so a reply can't smuggle in an
+// arbitrary link; trailing punctuation ("…/13).") is left outside the link.
+const BGG_URL_RE = /(https?:\/\/(?:www\.)?boardgamegeek\.com\/[^\s<>"']*[^\s<>"'.,;:!?)\]])/g;
+export function BggLinkText({text}){
+  return String(text ?? "").split(BGG_URL_RE).map((part, i) =>
+    i % 2
+      ? <a key={i} href={part} target="_blank" rel="noreferrer noopener" style={{color:T.steam,textDecoration:"underline"}}>{part}</a>
+      : part
+  );
+}
+
 export function CrewAssistant({ctx}){
   const {profile, authUser, users, games, food, supplies, voyageMenu, deckHands, receipts, itinerary} = ctx;
 
@@ -4765,7 +4823,7 @@ export function CrewAssistant({ctx}){
 
 
   // buildAllContext — all Firestore collections in one structured snapshot
-  const buildAllContext = () => {
+  const buildAllContext = (matcher) => {
     const uList  = Object.values(users      ||{});
     const gList  = Object.values(games      ||{}).filter(g=>!g.isRequest);
     const gReqs  = Object.values(games      ||{}).filter(g=>g.isRequest);
@@ -4791,6 +4849,8 @@ export function CrewAssistant({ctx}){
       if(g.category)      p.push(g.category);
       if(g.minPlayers)    p.push(`${g.minPlayers}${g.maxPlayers&&g.maxPlayers!==g.minPlayers?"-"+g.maxPlayers:""} players`);
       if(g.likes?.length) p.push(`${g.likes.length} votes`);
+      const bgg = matcher?.exact(g.name);
+      if(bgg) p.push(`${bgg.year}`, `BGG rating ${bgg.rating}/10`, `BGG link: ${bggGameUrl(bgg.id)}`);
       p.push(`brought by ${users[g.ownerId]?.name||"crew"}`);
       sections.push(p.join(" | "));
     }); else sections.push("Cargo Hold is empty — no games loaded.");
@@ -4875,18 +4935,18 @@ export function CrewAssistant({ctx}){
 
     // Detect topic and inject only the relevant Firestore sections
 
+    // BoardGameGeek index (null when none is published) — source of verified links/facts instead of model memory
+    const matcher = await getBggMatcher();
+
     // Always inject fresh Firestore snapshot
-    const ctx_snapshot = buildAllContext();
+    const ctx_snapshot = buildAllContext(matcher);
 
     // BGG lookup — if question mentions a specific game name, fetch BGG data
     let bggContext = "";
     const gAllList = Object.values(games||{});
 
     // Detect any game-related question — rules, details, info, or game name mentioned
-    const isGameQ = /\b(rules?|how.?to.?play|how.?do.?you.?play|explain|setup|set.?up|teach|mechanic|detail|info|tell me about|what is|weight|rating|how many player|how long|duration|category|expansion|similar|like|compare|strategy|tip|trick|beginner|advanced|overview|summary|description)\b/i.test(text);
-
-    // Check if any Cargo Hold game name is mentioned
-    const knownGame = gAllList.find(g => text.toLowerCase().includes(g.name.toLowerCase()));
+    const isGameQ = /\b(rules?|how.?to.?play|how.?do.?you.?play|explain|setup|set.?up|teach|mechanic|detail|info|tell me about|what is|weight|rating|how many player|how long|duration|category|expansion|similar|like|compare|strategy|tip|trick|beginner|advanced|overview|summary|description|links?|url|bgg|boardgamegeek|published|year|rated)\b/i.test(text);
 
     // Extract game name even if not in Cargo Hold
     const extractedName = (() => {
@@ -4899,23 +4959,29 @@ export function CrewAssistant({ctx}){
       return null;
     })();
 
-    const gameToLookup = knownGame?.name || ((isGameQ && extractedName) ? extractedName : null);
+    // Which games is the question about? Up to 3, from: (a) Cargo Hold games named in it — whole-word match, so a
+    // short name like "Go" doesn't fire inside "going"; (b) any BGG-indexed title in the text; (c) a name pulled
+    // out of "rules for X"-style phrasing (covers games outside the index).
+    const normText  = ` ${normalizeName(text)} `;
+    const looksGamey = isGameQ || /\b(games?|play(?:ing)?)\b/i.test(text);
+    const targets   = [];
+    const addTarget = (name) => {
+      if(name && targets.length < 3 && !targets.some(t => normalizeName(t) === normalizeName(name))) targets.push(name);
+    };
+    gAllList.filter(g => g.name && normText.includes(` ${normalizeName(g.name)} `)).forEach(g => addTarget(g.name));
+    if(matcher && looksGamey) matcher.findInText(text).forEach(g => addTarget(g.name));
+    if(!targets.length && isGameQ && extractedName) addTarget(cleanAskedTitle(extractedName));
 
-    if(gameToLookup){
-      console.log("[BGG] Triggered by game question, looking up:", gameToLookup);
-      const bggData = await lookupBGG(gameToLookup);
-      if(bggData){
-        bggContext = `\n\n=== BOARDGAMEGEEK DATA FOR "${bggData.name}" ===
-Name: ${bggData.name} (${bggData.year})
-Players: ${bggData.minPlayers}–${bggData.maxPlayers} | Playtime: ${bggData.minPlaytime}–${bggData.maxPlaytime} min | Min Age: ${bggData.minAge}+
-BGG Rating: ${bggData.rating}/10 | Complexity: ${bggData.weight}/5
-Categories: ${bggData.categories}
-Mechanics: ${bggData.mechanics}
-Description: ${bggData.description}
-BGG Link: ${bggData.bggUrl}
-Use this BGG data to give detailed, accurate information about this game.`;
+    if(targets.length){
+      console.log("[BGG] Triggered by game question, looking up:", targets.join(" | "));
+      if(matcher){
+        // Verified facts + real links straight from the index — no extra model call
+        bggContext = "\n\n" + targets.map(t => bggFactsBlock(matcher.find(t), t)).join("\n\n");
       } else {
-        console.log("[BGG] No data found for:", gameToLookup);
+        // No index published: fall back to the model's recollection, but only ever hand out a search link
+        const bggData = await lookupBGG(targets[0]);
+        if(bggData) bggContext = "\n\n" + legacyBggBlock(bggData, targets[0]);
+        else console.log("[BGG] No data found for:", targets[0]);
       }
     }
 
@@ -5020,7 +5086,7 @@ Use this BGG data to give detailed, accurate information about this game.`;
                 border:m.role==="model"?`1px solid ${T.border}`:"none",
                 whiteSpace:"pre-wrap", wordBreak:"break-word",
               }}>
-                {m.text}
+                {m.role==="model" ? <BggLinkText text={m.text}/> : m.text}
               </div>
               {m.role==="user"&&<Avatar name={profile?.name} picture={profile?.picture} size={28}/>}
             </div>
