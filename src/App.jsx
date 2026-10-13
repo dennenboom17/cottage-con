@@ -4240,6 +4240,75 @@ export function NarrativeManager({ctx}){
   </div>;
 }
 
+// ── Role guess board (private notes inside the dossier) ──────────────────────
+// Kept in localStorage, not Firestore: every signed-in user can read every Firestore user doc, so a guess saved there
+// would not be private. The trade-off is that guesses stay on the device they were made on.
+const guessKey = uid => `cc-role-guesses:${uid}`;
+function loadGuesses(uid){
+  try{
+    const v=JSON.parse(localStorage.getItem(guessKey(uid))||"{}");
+    return v&&typeof v==="object"&&!Array.isArray(v)?v:{};
+  }catch{ return {}; }
+}
+function saveGuesses(uid,g){
+  try{ localStorage.setItem(guessKey(uid),JSON.stringify(g)); }catch{ /* storage blocked or full: notes just won't persist */ }
+}
+
+export function RoleGuessBoard({uid,users}){
+  const [guesses,setGuesses]=useState(()=>loadGuesses(uid));
+  const crew=Object.entries(users||{}).filter(([id])=>id!==uid).map(([id,u])=>({...u,id}))
+    .sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+  const factions=Object.entries(NARRATIVE_FACTIONS);
+  const roles=Object.entries(NARRATIVE_ROLES);
+  const guessFor=id=>NARRATIVE_ROLES[guesses[id]]?guesses[id]:"";
+  const marked=crew.filter(c=>guessFor(c.id)).length;
+  const setGuess=(id,roleKey)=>{
+    const next={...guesses};
+    if(roleKey) next[id]=roleKey; else delete next[id];
+    saveGuesses(uid,next);
+    setGuesses(next);
+  };
+
+  return <Card style={{marginTop:14,border:`1.5px solid ${T.border2}`}}>
+    <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:8,flexWrap:"wrap",marginBottom:6}}>
+      <div style={{fontSize:11,fontWeight:700,color:T.amber,textTransform:"uppercase",letterSpacing:".08em",fontFamily:"'Cinzel',serif"}}>
+        🗂️ Crew Suspect Board
+      </div>
+      <div style={{fontSize:11,color:T.hint}}>{marked} of {crew.length} marked</div>
+    </div>
+    <p style={{fontSize:11,color:T.hint,lineHeight:1.5,margin:"0 0 12px"}}>
+      Your private guesses about who holds which role. Saved on this device only — nobody else can see them.
+    </p>
+    {crew.length===0
+      ?<p style={{fontSize:12,color:T.hint,fontStyle:"italic",margin:0}}>No other crew have joined yet.</p>
+      :<div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {crew.map(c=>{
+          const g=guessFor(c.id);
+          const role=g?NARRATIVE_ROLES[g]:null;
+          const fac=role?NARRATIVE_FACTIONS[role.faction]:null;
+          return <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",padding:"8px 10px",
+            background:fac?fac.bg:T.bgMid,borderRadius:6,border:`1.5px solid ${fac?fac.border:T.border}`}}>
+            <Avatar name={c.name} picture={c.picture} size={30}/>
+            <span style={{flex:1,minWidth:100,fontSize:13,fontWeight:500,color:T.text}}>{c.name||"Crew member"}</span>
+            <select aria-label={`Guess role for ${c.name||"crew member"}`} value={g}
+              onChange={e=>setGuess(c.id,e.target.value)}
+              style={{fontFamily:"inherit",fontSize:12,padding:"6px 10px",borderRadius:5,background:T.surface2,
+                color:fac?fac.color:T.text,border:`1.5px solid ${fac?fac.border:T.border2}`,cursor:"pointer",maxWidth:230}}>
+              <option value="">— Unknown —</option>
+              {factions.map(([fKey,f])=>(
+                <optgroup key={fKey} label={`${f.icon} ${f.name}`}>
+                  {roles.filter(([,r])=>r.faction===fKey).map(([rKey,r])=>(
+                    <option key={rKey} value={rKey}>{r.icon} {r.title}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>;
+        })}
+      </div>}
+  </Card>;
+}
+
 // ── Narrative Dossier (player view) ──────────────────────────────────────────
 export function NarrativeDossier({ctx}){
   const {profile,authUser,users}=ctx;
@@ -4337,6 +4406,9 @@ export function NarrativeDossier({ctx}){
             {role.suspectHint}
           </p>
         </Card>
+
+        {/* Private guesses about the rest of the crew */}
+        {authUser&&<RoleGuessBoard uid={authUser.uid} users={users}/>}
 
         {/* Reseal button */}
         <div style={{textAlign:"center",marginTop:18}}>

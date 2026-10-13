@@ -1,5 +1,5 @@
 import React from 'react'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NarrativeDossier, NarrativeManager, CaptainsLog, NARRATIVE_ROLES, NARRATIVE_FACTIONS, pickRandomRoles } from '../App.jsx'
@@ -243,5 +243,108 @@ describe('Personal Log dossier', () => {
   it('is not capped to a narrow column, so it matches the width of the other pages', () => {
     const { container } = render(<CaptainsLog ctx={baseCtx({ u1: {} })} />)
     expect(container.firstChild.style.maxWidth).toBe('')
+  })
+})
+
+describe('Crew suspect board (inside the dossier)', () => {
+  const me = { uid: 'u1' }
+  const users = {
+    u1: { name: 'Ana', narrativeRole: 'rebel_spy' },
+    u2: { name: 'Ben', narrativeRole: 'smuggler' },
+    u3: { name: 'Cleo', narrativeRole: 'imperial_agent' },
+  }
+  const renderOpen = async (over = {}) => {
+    const user = userEvent.setup()
+    const utils = render(<NarrativeDossier ctx={{ authUser: me, profile: {}, users, ...over }} />)
+    await user.click(screen.getByRole('button', { name: /open your dossier/i }))
+    return { user, ...utils }
+  }
+
+  beforeEach(() => localStorage.clear())
+
+  it('stays hidden while the dossier is sealed', () => {
+    render(<NarrativeDossier ctx={{ authUser: me, profile: {}, users }} />)
+    expect(screen.queryByText(/Crew Suspect Board/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Ben')).not.toBeInTheDocument()
+  })
+
+  it('lists every other crew member but not the player, starting with nothing marked', async () => {
+    await renderOpen()
+    expect(screen.getByText(/Crew Suspect Board/)).toBeInTheDocument()
+    expect(screen.getByText('Ben')).toBeInTheDocument()
+    expect(screen.getByText('Cleo')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Guess role for Ana')).not.toBeInTheDocument()
+    expect(screen.getByText('0 of 2 marked')).toBeInTheDocument()
+  })
+
+  it("never pre-fills or reveals anyone's real role", async () => {
+    await renderOpen()
+    expect(screen.getByLabelText('Guess role for Ben')).toHaveValue('')
+    expect(screen.getByLabelText('Guess role for Cleo')).toHaveValue('')
+  })
+
+  it('records a guess, counts it, and offers every role grouped by faction', async () => {
+    const { user } = await renderOpen()
+    const select = screen.getByLabelText('Guess role for Ben')
+    for (const f of Object.values(NARRATIVE_FACTIONS)) {
+      expect(within(select).getByRole('group', { name: `${f.icon} ${f.name}` })).toBeInTheDocument()
+    }
+    expect(within(select).getAllByRole('option')).toHaveLength(Object.keys(NARRATIVE_ROLES).length + 1)
+    await user.selectOptions(select, 'smuggler')
+    expect(select).toHaveValue('smuggler')
+    expect(screen.getByText('1 of 2 marked')).toBeInTheDocument()
+  })
+
+  it('can clear a guess back to unknown', async () => {
+    const { user } = await renderOpen()
+    const select = screen.getByLabelText('Guess role for Ben')
+    await user.selectOptions(select, 'smuggler')
+    await user.selectOptions(select, '')
+    expect(select).toHaveValue('')
+    expect(screen.getByText('0 of 2 marked')).toBeInTheDocument()
+  })
+
+  it('remembers guesses after the dossier is closed and reopened, and after a reload', async () => {
+    const { user, unmount } = await renderOpen()
+    await user.selectOptions(screen.getByLabelText('Guess role for Cleo'), 'imperial_security')
+    await user.click(screen.getByRole('button', { name: /seal dossier/i }))
+    await user.click(screen.getByRole('button', { name: /open your dossier/i }))
+    expect(screen.getByLabelText('Guess role for Cleo')).toHaveValue('imperial_security')
+
+    unmount()
+    await renderOpen()
+    expect(screen.getByLabelText('Guess role for Cleo')).toHaveValue('imperial_security')
+  })
+
+  it("keeps each player's guesses separate", async () => {
+    const { user, unmount } = await renderOpen()
+    await user.selectOptions(screen.getByLabelText('Guess role for Ben'), 'smuggler')
+    unmount()
+    await renderOpen({ authUser: { uid: 'u3' } })
+    expect(screen.getByLabelText('Guess role for Ben')).toHaveValue('')
+  })
+
+  it('ignores corrupt or outdated saved data instead of crashing', async () => {
+    localStorage.setItem('cc-role-guesses:u1', '{not json')
+    const first = await renderOpen()
+    expect(screen.getByLabelText('Guess role for Ben')).toHaveValue('')
+    first.unmount()
+
+    localStorage.setItem('cc-role-guesses:u1', JSON.stringify({ u2: 'role_that_was_removed' }))
+    await renderOpen()
+    expect(screen.getByLabelText('Guess role for Ben')).toHaveValue('')
+    expect(screen.getByText('0 of 2 marked')).toBeInTheDocument()
+  })
+
+  it('still works when storage is blocked', async () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked') })
+    const { user } = await renderOpen()
+    await user.selectOptions(screen.getByLabelText('Guess role for Ben'), 'smuggler')
+    expect(screen.getByLabelText('Guess role for Ben')).toHaveValue('smuggler')
+  })
+
+  it('says so when nobody else has joined', async () => {
+    await renderOpen({ users: { u1: { name: 'Ana', narrativeRole: 'rebel_spy' } } })
+    expect(screen.getByText('No other crew have joined yet.')).toBeInTheDocument()
   })
 })
