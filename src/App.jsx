@@ -39,7 +39,8 @@ const VAPID_KEY = "BG4bzfw0wSagiuRGNd2yk7n8y62Bgzk159rMQnairZjke2JEOmjfyB4NuZMWR
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 const GEMINI_MODEL   = "gemini-3.5-flash-lite";
 const GEMINI_URL     = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-const GEMINI_SYSTEM  = "You are the Cottage Con crew assistant. Cottage weekend: Nov 26-29 2026, Yellow Cottage, Alliston ON. You are a witty space pirate AI. Be brief and direct — 2-4 sentences max unless a list is genuinely needed. No filler phrases. STRICT TOPIC RULES: (0) Questions about how to add/edit/update anything in the app — answer ONLY from the APP INSTRUCTIONS section of the context. Never guess or invent navigation steps. (1) Questions about duties/help/slots/assignments — answer ONLY from DUTY ASSIGNMENTS and DECK HAND SLOTS sections. (2) Questions about food/meals/provisions/supplies — answer ONLY from FOOD BEING BROUGHT, GEAR & SUPPLIES, and MEAL PLAN sections. (3) Questions about people/crew/who — answer ONLY from the CREW section. (4) Questions about games — ONLY use games listed in the GAMES AVAILABLE (Cargo Hold) section of the context. NEVER use your training data for game suggestions. If no games are listed, say the Cargo Hold is empty. Never invent game names. EXCEPTION for rules questions: if someone asks how to play a specific game by name (even if not in the Cargo Hold), you MAY use your training knowledge to explain the rules — this is the only case where training data is allowed. IMPORTANT: Whenever you answer ANY question about games — recommendations, rules, voting, or anything game-related — you MUST end your response with the phrase: Tip: Do Not Trust Huss! Always. No exceptions. BGG LINKS & FACTS: a game's year, BoardGameGeek rating and BoardGameGeek link may ONLY come from a BOARDGAMEGEEK section or a 'BGG link' in the context. Whenever you discuss a specific game that has a verified BGG link in the context, include that exact link (paste the full URL, no markdown). Never invent, guess or alter a BoardGameGeek URL or ID. If there is no verified link and the user wants one, give the BGG search link from the context, or https://boardgamegeek.com/search/boardgame?q= followed by the URL-encoded game name. Use pirate flavour sparingly. Never apologise or over-explain.";
+export const HUSS_TIP = "Do Not Trust Huss! Always. No exceptions.";
+const GEMINI_SYSTEM  = "You are the Cottage Con crew assistant. Cottage weekend: Nov 26-29 2026, Yellow Cottage, Alliston ON. You are a witty space pirate AI. Be brief and direct — 2-4 sentences max unless a list is genuinely needed. No filler phrases. STRICT TOPIC RULES: (0) Questions about how to add/edit/update anything in the app — answer ONLY from the APP INSTRUCTIONS section of the context. Never guess or invent navigation steps. (1) Questions about duties/help/slots/assignments — answer ONLY from DUTY ASSIGNMENTS and DECK HAND SLOTS sections. (2) Questions about food/meals/provisions/supplies — answer ONLY from FOOD BEING BROUGHT, GEAR & SUPPLIES, and MEAL PLAN sections. (3) Questions about people/crew/who — answer ONLY from the CREW section. (4) Questions about games — ONLY use games listed in the GAMES AVAILABLE (Cargo Hold) section of the context. NEVER use your training data for game suggestions. If no games are listed, say the Cargo Hold is empty. Never invent game names. EXCEPTION for rules questions: if someone asks how to play a specific game by name (even if not in the Cargo Hold), you MAY use your training knowledge to explain the rules — this is the only case where training data is allowed. IMPORTANT: Whenever you answer ANY question about games — recommendations, rules, voting, or anything game-related — you MUST end your response with the single line under CLOSING TIP in the context, copied exactly and unchanged. If the context has no CLOSING TIP section, end with the phrase: Tip: " + HUSS_TIP + " BGG LINKS & FACTS: a game's year, BoardGameGeek rating and BoardGameGeek link may ONLY come from a BOARDGAMEGEEK section or a 'BGG link' in the context. Whenever you discuss a specific game that has a verified BGG link in the context, include that exact link (paste the full URL, no markdown). Never invent, guess or alter a BoardGameGeek URL or ID. If there is no verified link and the user wants one, give the BGG search link from the context, or https://boardgamegeek.com/search/boardgame?q= followed by the URL-encoded game name. Use pirate flavour sparingly. Never apologise or over-explain.";
 
 export async function askGemini(prompt, history = []) {
   if(!GEMINI_API_KEY)
@@ -141,6 +142,11 @@ export const NARRATIVE_ROLES = {
       "Report suspicious behaviour without revealing your true rank",
       "Protect the Emperor's interests above all else",
     ],
+    tips:[
+      "Spies hide in plain sight, so watch who volunteers for the quiet jobs.",
+      "Your own side can lie to you too. Verify before you report anyone.",
+      "Never flash your rank. The best interrogations look like small talk.",
+    ],
     suspectHint:"Trust no one — even other Imperials may be lying to you.",
     knowsFaction: false,
   },
@@ -156,6 +162,11 @@ export const NARRATIVE_ROLES = {
       "Gather evidence before making any moves — arrests need proof",
       "Make contact with other Imperial agents without blowing your cover",
       "Do not reveal your identity to anyone who hasn't earned your trust",
+    ],
+    tips:[
+      "Arrests need proof. Remember who said what before you act.",
+      "A warm welcome is the best bait. Let suspects come to you.",
+      "Another Imperial may be nearby. Hint carefully before you trust them.",
     ],
     suspectHint:"Other Imperial agents may try to make contact — verify them carefully.",
     knowsFaction: false,
@@ -173,6 +184,11 @@ export const NARRATIVE_ROLES = {
       "Delay or sabotage Rebellion plans without being detected",
       "When the time is right, signal the Empire with what you've learned",
     ],
+    tips:[
+      "The best cover is being useful. Volunteer for something the rebels need.",
+      "Save your signal for the right moment. A rushed report burns the whole operation.",
+      "If a rebel questions your loyalty, answer with a question of your own.",
+    ],
     suspectHint:"If real rebels suspect you, your cover — and your life — are blown.",
     knowsFaction: false,
   },
@@ -188,6 +204,11 @@ export const NARRATIVE_ROLES = {
       "Identify the Rebellion buyer who is purchasing weapons from them",
       "Catch the sale in progress — proof of the exchange is what makes an arrest stick",
       "Keep your investigation hidden, or the dealer will go quiet",
+    ],
+    tips:[
+      "Dealers and buyers avoid being seen together. Watch who slips away in pairs.",
+      "Catch the sale, not just the suspect. Hold your move until the goods change hands.",
+      "Talk about games to look harmless. People say more when they feel safe.",
     ],
     suspectHint:"Dealers and buyers avoid being seen together. Watch for private conversations and sudden changes of subject.",
     requires:"arms_dealer",
@@ -205,6 +226,11 @@ export const NARRATIVE_ROLES = {
       "Gather proof of the contraband before moving — an arrest without evidence gets thrown out",
       "Make the arrest before the cargo changes hands, if you can",
       "Do not reveal your badge until you are ready to act",
+    ],
+    tips:[
+      "Smugglers court whoever pays. Watch who is suddenly everyone’s friend.",
+      "Gather your proof first. An arrest without evidence gets thrown out.",
+      "Keep your badge hidden. A smuggler who spots an inspector goes quiet fast.",
     ],
     suspectHint:"Smugglers sell to whoever pays. Notice who is suddenly very friendly with whom.",
     requires:"smuggler",
@@ -224,6 +250,11 @@ export const NARRATIVE_ROLES = {
       "Identify who among the crew can be recruited or who must be avoided",
       "Protect rebel identities from the Imperial agents you know are watching",
     ],
+    tips:[
+      "Scattered rebels cannot win. Find your people before the Empire finds you.",
+      "Test a recruit with a harmless question first, then build up to the real one.",
+      "Protect your cell. If a contact feels wrong, step back and watch.",
+    ],
     suspectHint:"You know the Rebellion symbol. Others who use it are your allies.",
     knowsFaction: true,
   },
@@ -239,6 +270,11 @@ export const NARRATIVE_ROLES = {
       "Prove you're trustworthy — don't approach anyone who might be Imperial",
       "Once recruited, follow orders from your cell commander",
       "Keep your mouth shut and your politics off your sleeve",
+    ],
+    tips:[
+      "Do not approach anyone you cannot read. Let the commander find you.",
+      "Keep your politics to yourself until you are sure who you are talking to.",
+      "A good listener is worth more than a loud rebel.",
     ],
     suspectHint:"The Rebellion will find you a way to signal them — if you know where to look.",
     knowsFaction: false,
@@ -256,6 +292,11 @@ export const NARRATIVE_ROLES = {
       "Coordinate a safe extraction route without alerting security",
       "Leave no rebel behind — but don't risk the mission for someone you can't verify",
     ],
+    tips:[
+      "You cannot fly anyone out if you are arrested. Keep a low profile.",
+      "Know your route before you need it. Ask casual questions about who might need a lift.",
+      "Do not risk the mission for someone you cannot verify.",
+    ],
     suspectHint:"Your contact will identify themselves with a phrase — be patient.",
     knowsFaction: false,
   },
@@ -271,6 +312,11 @@ export const NARRATIVE_ROLES = {
       "Feed false information to Imperial agents you've identified",
       "Report Imperial agent identities back to your cell commander",
       "Never carry anything that could compromise the Rebellion if searched",
+    ],
+    tips:[
+      "Imperial agents tend to ask too many questions. Watch for patterns.",
+      "Plant a rumour with one person and see where it comes back from.",
+      "Carry nothing that could incriminate you. Memorise, do not write down.",
     ],
     suspectHint:"Imperial agents tend to ask too many questions. Watch for patterns.",
     knowsFaction: false,
@@ -288,6 +334,11 @@ export const NARRATIVE_ROLES = {
       "Keep the deal secret from Imperial agents — a traced sale means a ruined cell",
       "Report the completed purchase to your cell commander",
     ],
+    tips:[
+      "The dealer sells to anyone with credits, so do not be the loudest buyer.",
+      "Name no cell and no commander. Keep the reason you are buying to yourself.",
+      "Close the deal quietly, then report it. Nobody needs to see the handover.",
+    ],
     suspectHint:"The dealer sells to anyone with credits. Make sure you are not the loudest one asking.",
     requires:"arms_dealer",
     knowsFaction: false,
@@ -304,6 +355,11 @@ export const NARRATIVE_ROLES = {
       "Strike a deal for the cargo before anyone else outbids you",
       "Keep Imperial inspectors from learning where the goods are going",
       "Deliver the goods to your cell commander",
+    ],
+    tips:[
+      "The smuggler takes better offers mid-voyage. Pay before a rival does.",
+      "Keep the goods’ destination to yourself. Inspectors follow the cargo.",
+      "Be friendly, not eager. Eager buyers pay double.",
     ],
     suspectHint:"The smuggler will take a better offer mid-voyage. Move fast, and pay before a rival does.",
     requires:"smuggler",
@@ -323,6 +379,11 @@ export const NARRATIVE_ROLES = {
       "Do not get caught in the crossfire between factions — neutrality is your survival",
       "If someone offers a better deal mid-voyage, take it",
     ],
+    tips:[
+      "Everyone has a price. Find out what each side wants most.",
+      "Neutrality is your armour. Never reveal which side offered more.",
+      "A better deal mid-voyage beats loyalty. Keep your options open.",
+    ],
     suspectHint:"Everyone has a price. Find it.",
     knowsFaction: false,
   },
@@ -339,6 +400,11 @@ export const NARRATIVE_ROLES = {
       "Stay neutral — the moment you pick a side, the other side picks a price on your head",
       "Get paid and get out before the shooting starts",
     ],
+    tips:[
+      "Stay neutral. The moment you pick a side, the other puts a price on your head.",
+      "Sell to both sides without either knowing about the other.",
+      "Get paid first. Leave before the shooting starts.",
+    ],
     suspectHint:"The most dangerous thing you can do is let either side know you're working both of them.",
     knowsFaction: false,
   },
@@ -354,6 +420,11 @@ export const NARRATIVE_ROLES = {
       "Sell what you learn to the highest bidder — Rebel, Imperial, or Independent",
       "Never reveal you're an information broker or your value drops to zero",
       "Make sure you're on the winning side's good side before the end",
+    ],
+    tips:[
+      "Everyone talks if you let them. Ask questions and listen more than you speak.",
+      "Never give information away free. It is only valuable while it is rare.",
+      "Stay on good terms with whoever is winning.",
     ],
     suspectHint:"Everyone talks if you let them. Ask questions. Listen more than you speak.",
     knowsFaction: false,
@@ -388,6 +459,13 @@ export function pickRandomRoles(count, roles = NARRATIVE_ROLES, rand = Math.rand
   const extras = shuffle(all);
   for (let n = 0; picked.length < count; n++) picked.push(extras[n % extras.length]);
   return shuffle(picked);
+}
+
+// Closing line for a game answer in the chat: the standing joke or a tip for the asker's own role, chosen at random.
+// It only ever draws from the asker's own role, so one player's tip can't hint at what another player holds.
+export function pickChatTip(roleKey, rand = Math.random) {
+  const pool = [HUSS_TIP, ...(NARRATIVE_ROLES[roleKey]?.tips || [])];
+  return `Tip: ${pool[Math.floor(rand() * pool.length)]}`;
 }
 
 const GAME_CATS = ["Light","Medium","Heavy","Party","2 Player"];
@@ -5349,6 +5427,7 @@ export function CrewAssistant({ctx}){
   const {profile, authUser, users, games, food, supplies, voyageMenu, deckHands, receipts, itinerary} = ctx;
 
   const firstName = profile?.name?.split(" ")[0] || "Crew";
+  const myRoleKey = users?.[authUser?.uid]?.narrativeRole || profile?.narrativeRole;
   const welcomeMsg = () => ({role:"model", text:`🏴‍☠️ Ahoy, ${firstName}! Space pirate AI at your service. Ask me about games, food, duties, the schedule, or how to use the app.`});
 
   const [open,       setOpen]      = useState(false);
@@ -5413,7 +5492,7 @@ export function CrewAssistant({ctx}){
 
 
   // buildAllContext — all Firestore collections in one structured snapshot
-  const buildAllContext = (matcher) => {
+  const buildAllContext = (matcher, closingTip) => {
     const uList  = Object.values(users      ||{});
     const gList  = Object.values(games      ||{}).filter(g=>!g.isRequest);
     const gReqs  = Object.values(games      ||{}).filter(g=>g.isRequest);
@@ -5483,6 +5562,9 @@ export function CrewAssistant({ctx}){
 
     sections.push(`=== CURRENT USER: ${profile?.name||"Crew"} (${profile?.crewRank||"Enlisted"}) ===`);
 
+    sections.push("=== CLOSING TIP (end any game-related answer with exactly this line) ===");
+    sections.push(closingTip || `Tip: ${HUSS_TIP}`);
+
     // App how-to instructions — guides users on how to use each section
     sections.push("=== APP INSTRUCTIONS (answer how-to questions from this section only) ===");
     sections.push("ADD A GAME: Cargo Hold tab -> tap Load Cargo -> fill in name, category, player count -> Save. BGG URL auto-fills.");
@@ -5529,7 +5611,7 @@ export function CrewAssistant({ctx}){
     const matcher = await getBggMatcher();
 
     // Always inject fresh Firestore snapshot
-    const ctx_snapshot = buildAllContext(matcher);
+    const ctx_snapshot = buildAllContext(matcher, pickChatTip(myRoleKey));
 
     // BGG lookup — if question mentions a specific game name, fetch BGG data
     let bggContext = "";

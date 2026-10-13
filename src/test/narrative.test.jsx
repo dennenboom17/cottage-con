@@ -1,8 +1,9 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { NarrativeDossier, NarrativeManager, CaptainsLog, NARRATIVE_ROLES, NARRATIVE_FACTIONS, pickRandomRoles, scoreGuesses } from '../App.jsx'
+import { getDoc } from 'firebase/firestore'
+import { NarrativeDossier, NarrativeManager, CaptainsLog, NARRATIVE_ROLES, NARRATIVE_FACTIONS, pickRandomRoles, scoreGuesses, pickChatTip, HUSS_TIP, CrewAssistant, resetBggMatcher } from '../App.jsx'
 
 describe('narrative data', () => {
   it('gives every role a valid faction and a complete briefing', () => {
@@ -46,6 +47,14 @@ describe('narrative data', () => {
       if (!r.requires) continue
       expect(NARRATIVE_ROLES[r.requires], `${key} requires ${r.requires}`).toBeTruthy()
       expect(NARRATIVE_ROLES[r.requires].requires, `${r.requires} must not chain`).toBeUndefined()
+    }
+  })
+
+  it('gives every role at least three distinct, non-empty chat tips', () => {
+    for (const [key, r] of Object.entries(NARRATIVE_ROLES)) {
+      expect(r.tips.length, `${key} tips`).toBeGreaterThanOrEqual(3)
+      expect(new Set(r.tips).size, `${key} distinct`).toBe(r.tips.length)
+      for (const t of r.tips) expect(t.trim(), key).toBeTruthy()
     }
   })
 
@@ -506,5 +515,113 @@ describe('Crew suspect board check', () => {
   it('has no check button when nobody else has joined', async () => {
     await open({ u1: users.u1 })
     expect(screen.queryByRole('button', { name: /check my guesses/i })).not.toBeInTheDocument()
+  })
+})
+
+describe('pickChatTip', () => {
+  const role = NARRATIVE_ROLES.rebel_spy
+
+  it('falls back to the standing joke for a player with no role, or an unknown one', () => {
+    for (const key of [undefined, null, '', 'no_such_role']) {
+      for (const r of [0, 0.5, 0.999]) expect(pickChatTip(key, () => r)).toBe(`Tip: ${HUSS_TIP}`)
+    }
+  })
+
+  it('keeps the standing joke in the pool alongside the role tips', () => {
+    expect(pickChatTip('rebel_spy', () => 0)).toBe(`Tip: ${HUSS_TIP}`)
+    expect(pickChatTip('rebel_spy', () => 0.999)).toBe(`Tip: ${role.tips.at(-1)}`)
+  })
+
+  it('can reach every tip for the role, and nothing else', () => {
+    const pool = [HUSS_TIP, ...role.tips].map(t => `Tip: ${t}`)
+    const seen = new Set()
+    for (let i = 0; i < 100; i++) seen.add(pickChatTip('rebel_spy', () => i / 100))
+    expect([...seen].sort()).toEqual([...pool].sort())
+  })
+
+  it("never uses another role's tips", () => {
+    const others = Object.entries(NARRATIVE_ROLES).filter(([k]) => k !== 'rebel_spy').flatMap(([, r]) => r.tips)
+    for (let i = 0; i < 100; i++) expect(others).not.toContain(pickChatTip('rebel_spy', () => i / 100).replace(/^Tip: /, ''))
+  })
+})
+
+describe('chat closing tip', () => {
+  const reply = (text) => ({ ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text }] } }] }), text: async () => text })
+  const requestText = (f, call = -1) => JSON.parse(f.mock.calls.at(call)[1].body).contents.at(-1).parts[0].text
+  const systemText = (f) => JSON.parse(f.mock.calls[0][1].body).system_instruction.parts[0].text
+  const mkCtx = (users, uid = 'me', over = {}) => ({
+    profile: { name: 'Ann Lee' }, authUser: { uid }, users,
+    games: {}, food: {}, supplies: {}, voyageMenu: {}, deckHands: {}, receipts: {}, itinerary: {}, ...over,
+  })
+  const askOnce = async (ctx, q = "What's for dinner tonight?") => {
+    const user = userEvent.setup()
+    render(<CrewAssistant ctx={ctx} />)
+    await user.click(screen.getByLabelText('Open crew assistant'))
+    await user.type(screen.getByPlaceholderText(/Ask anything/), `${q}{Enter}`)
+    await screen.findByText('ok')
+    return user
+  }
+  let f
+
+  beforeEach(() => {
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    resetBggMatcher()
+    getDoc.mockResolvedValue({ exists: () => false, data: () => ({}) })
+    f = vi.fn(async () => reply('ok'))
+    vi.stubGlobal('fetch', f)
+  })
+  afterEach(() => { resetBggMatcher(); vi.restoreAllMocks() })
+
+  it("hands the model one of the asker's own role tips as the closing line", async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99)
+    await askOnce(mkCtx({ me: { id: 'me', name: 'Ann Lee', narrativeRole: 'smuggler' } }))
+    const req = requestText(f)
+    expect(req).toContain('=== CLOSING TIP')
+    expect(req).toContain(`Tip: ${NARRATIVE_ROLES.smuggler.tips.at(-1)}`)
+  })
+
+  it('uses the standing joke for a player with no role', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99)
+    await askOnce(mkCtx({ me: { id: 'me', name: 'Ann Lee' } }))
+    expect(requestText(f)).toContain(`=== CLOSING TIP (end any game-related answer with exactly this line) ===\nTip: ${HUSS_TIP}`)
+  })
+
+  it("never leaks another player's role or their tips to the asker", async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    const other = NARRATIVE_ROLES.arms_dealer
+    await askOnce(mkCtx({
+      me: { id: 'me', name: 'Ann Lee', narrativeRole: 'rebel_spy' },
+      u2: { id: 'u2', name: 'Ben', narrativeRole: 'arms_dealer' },
+    }))
+    const req = requestText(f)
+    expect(req).not.toContain(other.title)
+    for (const t of other.tips) expect(req).not.toContain(t)
+    expect(req).not.toContain('arms_dealer')
+  })
+
+  it('picks again for every question', async () => {
+    const rnd = vi.spyOn(Math, 'random').mockReturnValue(0)
+    const ctx = mkCtx({ me: { id: 'me', name: 'Ann Lee', narrativeRole: 'smuggler' } })
+    const user = await askOnce(ctx)
+    rnd.mockReturnValue(0.99)
+    await user.type(screen.getByPlaceholderText(/Ask anything/), 'And tomorrow?{Enter}')
+    await vi.waitFor(() => expect(f).toHaveBeenCalledTimes(2))
+    expect(requestText(f, 0)).toContain(`Tip: ${HUSS_TIP}`)
+    expect(requestText(f, 1)).toContain(`Tip: ${NARRATIVE_ROLES.smuggler.tips.at(-1)}`)
+  })
+
+  it('reads the live role, not the one loaded at sign-in', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99)
+    await askOnce(mkCtx(
+      { me: { id: 'me', name: 'Ann Lee', narrativeRole: 'smuggler' } }, 'me',
+      { profile: { name: 'Ann Lee', narrativeRole: 'rebel_spy' } }))
+    expect(requestText(f)).toContain(`Tip: ${NARRATIVE_ROLES.smuggler.tips.at(-1)}`)
+  })
+
+  it('tells the model to use the closing tip, and keeps the standing joke as the fallback', async () => {
+    await askOnce(mkCtx({ me: { id: 'me', name: 'Ann Lee' } }))
+    const sys = systemText(f)
+    expect(sys).toContain('CLOSING TIP')
+    expect(sys).toContain(`Tip: ${HUSS_TIP}`)
   })
 })
