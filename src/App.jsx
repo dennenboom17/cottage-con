@@ -1800,7 +1800,6 @@ const TABS=[
   {id:"deckhands",  label:"Deck Hands",   icon:"ti-bucket"},
   {id:"manifest",   label:"Manifest",     icon:"ti-receipt"},
   {id:"engineroom", label:"Engine Room",  icon:"ti-settings-cog"},
-  {id:"dossier",    label:"Dossier",      icon:"ti-file-shredder"},
   {id:"profile",    label:"Personal Log", icon:"ti-user"},
 ];
 
@@ -1865,7 +1864,6 @@ function Shell({ctx}){
       {view==="deckhands"  &&<DeckHands ctx={ctx}/>}
       {view==="manifest"   &&<Manifest ctx={ctx}/>}
       {view==="engineroom" &&<EngineRoom ctx={ctx}/>}
-      {view==="dossier"    &&<NarrativeDossier ctx={ctx}/>}
       {view==="profile"    &&<CaptainsLog ctx={ctx}/>}
     </main>
 
@@ -3108,7 +3106,7 @@ function VoyageMenu({voyageMenu,users,authUser,doSaveMenuItem,doDelMenuItem}){
 }
 
 // ── Personal Log ─────────────────────────────────────────────────────────────
-function CaptainsLog({ctx}){
+export function CaptainsLog({ctx}){
   const {profile,authUser,games,users,food,supplies,deckHands,doUpdateProfile,doLogout,notifPerm,notifSupported,requestPermission,doLogGamePlayed,doRemoveGamePlayed,showToast}=ctx;
   const [name,setName]=useState(profile?.name||"");
   const [diet,setDiet]=useState(profile?.dietary||[]);
@@ -3157,8 +3155,11 @@ function CaptainsLog({ctx}){
     </div>
   );
 
-  return <div className="cc-fade" style={{maxWidth:520}}>
+  return <div className="cc-fade">
     <SectionTitle sub="Your crew record and personal preferences">Personal Log</SectionTitle>
+
+    {/* ── Secret role briefing (sealed until unlocked) ── */}
+    <NarrativeDossier ctx={ctx}/>
 
     {/* ── Profile edit card ── */}
     <Card style={{background:T.bgMid,border:`1px solid ${T.border2}`,marginBottom:18}}>
@@ -4095,7 +4096,7 @@ export function NarrativeManager({ctx}){
       </button>
     </div>
     <p style={{fontSize:12,color:T.muted,marginBottom:20,lineHeight:1.6}}>
-      Assign each crew member a secret role. They will see their own dossier in the <strong style={{color:T.amber}}>Dossier</strong> tab — but never anyone else's. Roles can be reassigned at any time.
+      Assign each crew member a secret role. They will see their own dossier at the top of their <strong style={{color:T.amber}}>Personal Log</strong> — but never anyone else's. Roles can be reassigned at any time.
     </p>
 
     {/* Faction legend */}
@@ -4153,10 +4154,9 @@ export function NarrativeDossier({ctx}){
   const [revealed,setRevealed]=useState(false);
 
   if(!role){
-    return <div className="cc-fade">
-      <SectionTitle sub="Your classified mission briefing">Dossier</SectionTitle>
-      <Card style={{textAlign:"center",padding:"48px 24px"}}>
-        <div style={{fontSize:52,marginBottom:14}}>🔒</div>
+    return <div style={{marginBottom:18}}>
+      <Card style={{textAlign:"center",padding:"28px 24px"}}>
+        <div style={{fontSize:40,marginBottom:10}}>🔒</div>
         <h3 style={{fontFamily:"'Cinzel',serif",fontSize:16,color:T.amber,marginBottom:8}}>No Dossier Assigned</h3>
         <p style={{fontSize:13,color:T.muted,lineHeight:1.7,maxWidth:340,margin:"0 auto"}}>
           Your mission briefing hasn't been issued yet. The Engine Room officer will assign your role before the operation begins. Check back soon.
@@ -4165,13 +4165,12 @@ export function NarrativeDossier({ctx}){
     </div>;
   }
 
-  return <div className="cc-fade">
-    <SectionTitle sub="Your classified mission briefing — eyes only">Dossier</SectionTitle>
+  return <div style={{marginBottom:18}}>
 
     {/* Sealed dossier — tap to reveal */}
     {!revealed
-      ?<div onClick={()=>setRevealed(true)} style={{cursor:"pointer"}}><Card style={{textAlign:"center",padding:"52px 24px",border:`2px solid ${fac.border}`,background:fac.bg}}>
-        <div style={{fontSize:56,marginBottom:16}}>📁</div>
+      ?<div onClick={()=>setRevealed(true)} style={{cursor:"pointer"}}><Card style={{textAlign:"center",padding:"32px 24px",border:`2px solid ${fac.border}`,background:fac.bg}}>
+        <div style={{fontSize:44,marginBottom:12}}>📁</div>
         <div style={{fontFamily:"'Cinzel',serif",fontSize:13,fontWeight:700,color:fac.color,marginBottom:6,letterSpacing:".08em",textTransform:"uppercase"}}>
           {fac.icon} {fac.name} — Classified
         </div>

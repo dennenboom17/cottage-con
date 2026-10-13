@@ -42,7 +42,7 @@ There is no test suite/framework configured in this repo.
 - Tests live in `src/test/` (`npm test`; Vitest + Testing Library, Firebase fully mocked in `src/test/setup.js`). Set `BGG_RANKS_CSV` to a downloaded dump to also run the real-data index test.
 
 ### Narrative roles (secret-role game layer)
-- `NARRATIVE_FACTIONS` / `NARRATIVE_ROLES` (App.jsx, exported) define the roles. An admin assigns one per player in **Engine Room → Narrative Roles** (`NarrativeManager`, stored as `users/{uid}.narrativeRole` via `doAssignNarrativeRole`); each player sees only their own briefing in the **Dossier** tab (`NarrativeDossier`).
+- `NARRATIVE_FACTIONS` / `NARRATIVE_ROLES` (App.jsx, exported) define the roles. An admin assigns one per player in **Engine Room → Narrative Roles** (`NarrativeManager`, stored as `users/{uid}.narrativeRole` via `doAssignNarrativeRole`); each player sees only their own briefing in a sealed card at the top of the **Personal Log** (`NarrativeDossier`, rendered by `CaptainsLog`; tap to unlock).
 - It's honor-system only: every signed-in user can read every `users` doc, so roles are not truly hidden. `NarrativeDossier` reads the live `users[uid]` doc rather than `profile` because `profile` is loaded once at sign-in and would miss a role assigned later. `Card` ignores `onClick`, so attach click handlers to a wrapper element.
 
 ### Push notifications

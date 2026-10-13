@@ -2,7 +2,7 @@ import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { NarrativeDossier, NarrativeManager, NARRATIVE_ROLES, NARRATIVE_FACTIONS } from '../App.jsx'
+import { NarrativeDossier, NarrativeManager, CaptainsLog, NARRATIVE_ROLES, NARRATIVE_FACTIONS } from '../App.jsx'
 
 describe('narrative data', () => {
   it('gives every role a valid faction and a complete briefing', () => {
@@ -123,5 +123,42 @@ describe('NarrativeManager', () => {
     const keys = ctx.doAssignNarrativeRole.mock.calls.map(c => c[1])
     expect(new Set(keys).size).toBe(2) // fewer crew than roles, so no one shares a role
     expect(ctx.showToast).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Personal Log dossier', () => {
+  const role = NARRATIVE_ROLES.rebel_spy
+  const baseCtx = (users) => ({
+    authUser: { uid: 'u1' },
+    profile: { id: 'u1', name: 'Ana', email: 'ana@example.com' },
+    users, games: {}, food: {}, supplies: {}, deckHands: {},
+    doUpdateProfile: vi.fn(), doLogout: vi.fn(), showToast: vi.fn(),
+  })
+
+  it('puts the sealed dossier above the profile form', () => {
+    render(<CaptainsLog ctx={baseCtx({ u1: { narrativeRole: 'rebel_spy' } })} />)
+    const open = screen.getByRole('button', { name: /open your dossier/i })
+    const profileForm = screen.getByText('Display name')
+    expect(open.compareDocumentPosition(profileForm) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByText(role.secret)).not.toBeInTheDocument()
+  })
+
+  it('unlocks in place without hiding the rest of the log', async () => {
+    const user = userEvent.setup()
+    render(<CaptainsLog ctx={baseCtx({ u1: { narrativeRole: 'rebel_spy' } })} />)
+    await user.click(screen.getByRole('button', { name: /open your dossier/i }))
+    expect(screen.getByText(role.secret)).toBeInTheDocument()
+    expect(screen.getByText('Display name')).toBeInTheDocument()
+    expect(screen.getByText(/My Contributions/)).toBeInTheDocument()
+  })
+
+  it('shows a locked card when no role has been issued yet', () => {
+    render(<CaptainsLog ctx={baseCtx({ u1: { name: 'Ana' } })} />)
+    expect(screen.getByText('No Dossier Assigned')).toBeInTheDocument()
+  })
+
+  it('is not capped to a narrow column, so it matches the width of the other pages', () => {
+    const { container } = render(<CaptainsLog ctx={baseCtx({ u1: {} })} />)
+    expect(container.firstChild.style.maxWidth).toBe('')
   })
 })
