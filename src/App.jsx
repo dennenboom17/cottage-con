@@ -120,6 +120,178 @@ const CREW_RANKS = {
   "Enlisted": {icon:"⚙️", bg:"#0a1828", text:"#93C5FD", border:"#206880", glow:"#93C5FD"},
   "Stowaway": {icon:"🐭", bg:"#1a0a28", text:"#CC60FF", border:"#6A2090", glow:"#CC60FF"},
 };
+// ── Narrative Roles ───────────────────────────────────────────────────────────
+export const NARRATIVE_FACTIONS = {
+  empire:    { name:"Galactic Empire",   short:"Empire",    color:"#F87171", bg:"#1A0E0E", border:"#991B1B", icon:"🔴", glow:"#F87171" },
+  rebellion: { name:"The Rebellion",     short:"Rebellion", color:"#4ADE80", bg:"#162A1E", border:"#166534", icon:"🟢", glow:"#4ADE80" },
+  independent:{ name:"Independent",      short:"Independent",color:"#FCD34D", bg:"#1C1A0E", border:"#92400E", icon:"🟡", glow:"#FCD34D" },
+};
+export const NARRATIVE_ROLES = {
+  // ── EMPIRE ──────────────────────────────────────────────────────────────
+  imperial_security: {
+    faction:"empire",
+    title:"Imperial Security Director",
+    subtitle:"Internal Affairs — watching your own side",
+    icon:"🕵️",
+    cover:"Attending as a casual crew member",
+    secret:"You are ISB Internal Security. Your mission is not just to catch rebels — it's to root out Imperial agents who may have been turned or compromised. You answer only to the Emperor.",
+    objectives:[
+      "Identify which crew members are secretly Rebellion sympathisers",
+      "Determine if any Imperial agents have been compromised or are double agents",
+      "Report suspicious behaviour without revealing your true rank",
+      "Protect the Emperor's interests above all else",
+    ],
+    suspectHint:"Trust no one — even other Imperials may be lying to you.",
+    knowsFaction: false,
+  },
+  imperial_agent: {
+    faction:"empire",
+    title:"Imperial Intelligence Agent",
+    subtitle:"Standard Security — hunting rebels",
+    icon:"🎖️",
+    cover:"Recreational traveller with no allegiances",
+    secret:"You are an embedded Imperial agent tasked with identifying and capturing Rebellion members aboard this vessel.",
+    objectives:[
+      "Identify and expose any Rebellion members in the crew",
+      "Gather evidence before making any moves — arrests need proof",
+      "Make contact with other Imperial agents without blowing your cover",
+      "Do not reveal your identity to anyone who hasn't earned your trust",
+    ],
+    suspectHint:"Other Imperial agents may try to make contact — verify them carefully.",
+    knowsFaction: false,
+  },
+  imperial_mole: {
+    faction:"empire",
+    title:"Imperial Double Agent",
+    subtitle:"Planted inside the Rebellion — report back",
+    icon:"🐍",
+    cover:"You have successfully infiltrated the Rebellion",
+    secret:"You are an Imperial sleeper agent who has been posing as a Rebellion sympathiser for months. Your orders: let the rebels reveal their network, then bring it all down at once.",
+    objectives:[
+      "Maintain your cover as a trusted Rebellion member",
+      "Learn the identities of other Rebellion members and their objectives",
+      "Delay or sabotage Rebellion plans without being detected",
+      "When the time is right, signal the Empire with what you've learned",
+    ],
+    suspectHint:"If real rebels suspect you, your cover — and your life — are blown.",
+    knowsFaction: false,
+  },
+  // ── REBELLION ────────────────────────────────────────────────────────────
+  rebel_commander: {
+    faction:"rebellion",
+    title:"Rebellion Cell Commander",
+    subtitle:"Coordinating the uprising from the shadows",
+    icon:"✊",
+    cover:"Engineer on routine maintenance assignment",
+    secret:"You are the senior Rebellion officer on this vessel. Your mission: unite all rebel cells and prepare for the uprising. You know who else is Rebellion — if you can find them.",
+    objectives:[
+      "Make contact with your Rebellion comrades without Imperial eyes noticing",
+      "Coordinate a unified plan — scattered rebels can't overthrow an Empire",
+      "Identify who among the crew can be recruited or who must be avoided",
+      "Protect rebel identities from the Imperial agents you know are watching",
+    ],
+    suspectHint:"You know the Rebellion symbol. Others who use it are your allies.",
+    knowsFaction: true,
+  },
+  rebel_recruit: {
+    faction:"rebellion",
+    title:"Rebellion Sympathiser",
+    subtitle:"Ready to join — just waiting for the signal",
+    icon:"🌱",
+    cover:"Ordinary citizen who's had enough of the Empire",
+    secret:"You've made contact with the Rebellion and you want in. Your mission: find your handler, prove your loyalty, and receive your assignment — before Imperial agents notice your politics.",
+    objectives:[
+      "Find the Rebellion representative aboard this vessel",
+      "Prove you're trustworthy — don't approach anyone who might be Imperial",
+      "Once recruited, follow orders from your cell commander",
+      "Keep your mouth shut and your politics off your sleeve",
+    ],
+    suspectHint:"The Rebellion will find you a way to signal them — if you know where to look.",
+    knowsFaction: false,
+  },
+  rebel_pilot: {
+    faction:"rebellion",
+    title:"Rebel Extraction Pilot",
+    subtitle:"The getaway — if everything goes to plan",
+    icon:"🚀",
+    cover:"Charter pilot between runs, no fixed allegiances",
+    secret:"You fly for the Rebellion. Your ship is prepped and ready. Your job: get the right people out — and only the right people. You need to know who they are first.",
+    objectives:[
+      "Identify the Rebellion members who need extraction",
+      "Stay unnoticed by Imperial agents — you can't fly anyone to safety if you're arrested",
+      "Coordinate a safe extraction route without alerting security",
+      "Leave no rebel behind — but don't risk the mission for someone you can't verify",
+    ],
+    suspectHint:"Your contact will identify themselves with a phrase — be patient.",
+    knowsFaction: false,
+  },
+  rebel_spy: {
+    faction:"rebellion",
+    title:"Rebel Intelligence Officer",
+    subtitle:"Stealing Imperial secrets one conversation at a time",
+    icon:"🔍",
+    cover:"Academic researcher, vaguely curious about everything",
+    secret:"You are the Rebellion's eyes and ears. Your mission: identify Imperial agents in the crew and gather any intelligence that helps the Rebellion's cause.",
+    objectives:[
+      "Identify which crew members work for the Empire",
+      "Feed false information to Imperial agents you've identified",
+      "Report Imperial agent identities back to your cell commander",
+      "Never carry anything that could compromise the Rebellion if searched",
+    ],
+    suspectHint:"Imperial agents tend to ask too many questions. Watch for patterns.",
+    knowsFaction: false,
+  },
+  // ── INDEPENDENTS ─────────────────────────────────────────────────────────
+  smuggler: {
+    faction:"independent",
+    title:"Black Market Smuggler",
+    subtitle:"Cargo first. Politics never.",
+    icon:"📦",
+    cover:"Import-export consultant with flexible ethics",
+    secret:"You move illegal goods between systems and you answer to no one — Empire or Rebellion. Right now you're carrying something both sides want, and you need to offload it before they search the vessel.",
+    objectives:[
+      "Find a buyer for your cargo — Empire credits or Rebellion resources, you don't care",
+      "Avoid Imperial inspection by keeping suspicion off yourself",
+      "Do not get caught in the crossfire between factions — neutrality is your survival",
+      "If someone offers a better deal mid-voyage, take it",
+    ],
+    suspectHint:"Everyone has a price. Find it.",
+    knowsFaction: false,
+  },
+  arms_dealer: {
+    faction:"independent",
+    title:"Freelance Arms Dealer",
+    subtitle:"Weapons to whoever pays — may the best faction win",
+    icon:"🔫",
+    cover:"Technical supply representative on a sales tour",
+    secret:"You're selling to both sides. The Empire wants your weapons to suppress the Rebellion. The Rebellion wants them to fight back. You just want to profit without getting executed by the losing side.",
+    objectives:[
+      "Broker weapon deals with both Imperial and Rebellion members without either knowing",
+      "Identify who has resources to pay and what they urgently need",
+      "Stay neutral — the moment you pick a side, the other side picks a price on your head",
+      "Get paid and get out before the shooting starts",
+    ],
+    suspectHint:"The most dangerous thing you can do is let either side know you're working both of them.",
+    knowsFaction: false,
+  },
+  information_broker: {
+    faction:"independent",
+    title:"Information Broker",
+    subtitle:"Secrets are the only currency that never inflates",
+    icon:"📡",
+    cover:"Freelance journalist doing a feature on space travel",
+    secret:"You collect and sell information to whoever pays most. You've already sold the same intelligence to three parties. Right now you have something explosive and you're running an auction.",
+    objectives:[
+      "Discover the identities and objectives of as many crew members as possible",
+      "Sell what you learn to the highest bidder — Rebel, Imperial, or Independent",
+      "Never reveal you're an information broker or your value drops to zero",
+      "Make sure you're on the winning side's good side before the end",
+    ],
+    suspectHint:"Everyone talks if you let them. Ask questions. Listen more than you speak.",
+    knowsFaction: false,
+  },
+};
+
 const GAME_CATS = ["Light","Medium","Heavy","Party","2 Player"];
 const GAME_CAT_COLORS = {
   "Light":    {bg:"#162A1E",text:"#4ADE80",border:"#166534",icon:"🌿",glow:"#4ADE80"},
@@ -1345,6 +1517,13 @@ export default function App(){
     showToast(value ? "💰 Deposit marked received!" : "Deposit cleared.");
   };
 
+  // Narrative role assignment — engine room only (quiet skips the toast, for bulk assignment)
+  const doAssignNarrativeRole = async (userId, roleKey, quiet=false) => {
+    if(!users[userId]) return;
+    await fsSet("users", userId, {narrativeRole: roleKey || null});
+    if(!quiet) showToast(roleKey ? "Role assigned!" : "Role cleared.");
+  };
+
   // Crew rank — engine room override (users can also set their own in Personal Log)
   const doSetRank = async (userId, rank) => {
     const userDoc = users[userId];
@@ -1361,7 +1540,7 @@ export default function App(){
     doSaveFood,doDelFood,doSaveSupply,doDelSupply,
     doSaveMenuItem,doDelMenuItem,doClaimSlot,doUnclaimSlot,doInitDeckHands,
     doSaveReceipt,doDelReceipt,
-    doSaveItinDay,doDelItinDay,doSaveDeckSlot,doDelDeckSlot,doSetDeposit,doSetRank,doSendNotification,doSaveCostSettings,costSettings,doSaveItinMeta,itinMeta,
+    doSaveItinDay,doDelItinDay,doSaveDeckSlot,doDelDeckSlot,doSetDeposit,doSetRank,doSendNotification,doSaveCostSettings,costSettings,doSaveItinMeta,itinMeta,doAssignNarrativeRole,
     notifPerm,notifSupported,requestPermission};
 
   return <>
@@ -1621,6 +1800,7 @@ const TABS=[
   {id:"deckhands",  label:"Deck Hands",   icon:"ti-bucket"},
   {id:"manifest",   label:"Manifest",     icon:"ti-receipt"},
   {id:"engineroom", label:"Engine Room",  icon:"ti-settings-cog"},
+  {id:"dossier",    label:"Dossier",      icon:"ti-file-shredder"},
   {id:"profile",    label:"Personal Log", icon:"ti-user"},
 ];
 
@@ -1685,6 +1865,7 @@ function Shell({ctx}){
       {view==="deckhands"  &&<DeckHands ctx={ctx}/>}
       {view==="manifest"   &&<Manifest ctx={ctx}/>}
       {view==="engineroom" &&<EngineRoom ctx={ctx}/>}
+      {view==="dossier"    &&<NarrativeDossier ctx={ctx}/>}
       {view==="profile"    &&<CaptainsLog ctx={ctx}/>}
     </main>
 
@@ -3871,7 +4052,7 @@ function EngineRoom({ctx}){
     <div className="cc-fade">
       <SectionTitle sub="Manage itinerary days and deck hand duties">Engine Room</SectionTitle>
       <div style={{display:"flex",gap:8,marginBottom:22,flexWrap:"wrap"}}>
-        {[["itinerary","🗓 Itinerary Days"],["deckslots","⚙️ Deck Hand Slots"],["deposits","💰 Deposits"],["ranks","⚓ Crew Ranks"],["notify","📨 Notify"],["costs","🧮 Cost Calculator"],["bgg","📚 BGG Index"]].map(([id,label])=>(
+        {[["itinerary","🗓 Itinerary Days"],["deckslots","⚙️ Deck Hand Slots"],["deposits","💰 Deposits"],["ranks","⚓ Crew Ranks"],["notify","📨 Notify"],["costs","🧮 Cost Calculator"],["bgg","📚 BGG Index"],["narrative","🎭 Narrative Roles"]].map(([id,label])=>(
           <button key={id} onClick={()=>setTab(id)} style={{fontFamily:"'Cinzel',serif",fontSize:12,fontWeight:700,padding:"7px 16px",borderRadius:5,cursor:"pointer",border:`2px solid ${tab===id?T.amber:T.border}`,background:tab===id?T.amberSoft:"transparent",color:tab===id?T.amber:T.muted,transition:"all .15s"}}>{label}</button>
         ))}
       </div>
@@ -3882,8 +4063,197 @@ function EngineRoom({ctx}){
       {tab==="notify"&&<NotifyPanel ctx={ctx}/>}
       {tab==="costs"&&<CostCalculator ctx={ctx}/>}
       {tab==="bgg"&&<BggIndexManager ctx={ctx}/>}
+      {tab==="narrative"&&<NarrativeManager ctx={ctx}/>}
     </div>
   );
+}
+
+// ── Narrative Manager (Engine Room) ──────────────────────────────────────────
+export function NarrativeManager({ctx}){
+  const {users,doAssignNarrativeRole,showToast}=ctx;
+  const uList=Object.entries(users).map(([id,u])=>({...u,id}));
+  const factions=Object.entries(NARRATIVE_FACTIONS);
+  const roles=Object.entries(NARRATIVE_ROLES);
+
+  const randomAssign=async()=>{
+    const shuffled=Object.keys(NARRATIVE_ROLES);
+    for(let i=shuffled.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];
+    }
+    for(let i=0;i<uList.length;i++){
+      await doAssignNarrativeRole(uList[i].id,shuffled[i%shuffled.length],true);
+    }
+    showToast("🎭 Roles randomly assigned!");
+  };
+
+  return <div>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:8}}>
+      <h3 style={{fontFamily:"'Cinzel',serif",fontSize:14,color:T.amber,margin:0}}>🎭 Narrative Role Assignment</h3>
+      <button onClick={randomAssign} style={{fontFamily:"'Cinzel',serif",fontSize:12,fontWeight:700,padding:"8px 18px",borderRadius:5,cursor:"pointer",border:`2px solid ${T.amber}`,background:T.amberSoft,color:T.amber}}>
+        <i className="ti ti-arrows-shuffle"/> Randomly Assign All
+      </button>
+    </div>
+    <p style={{fontSize:12,color:T.muted,marginBottom:20,lineHeight:1.6}}>
+      Assign each crew member a secret role. They will see their own dossier in the <strong style={{color:T.amber}}>Dossier</strong> tab — but never anyone else's. Roles can be reassigned at any time.
+    </p>
+
+    {/* Faction legend */}
+    <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
+      {factions.map(([key,f])=>(
+        <div key={key} style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:11,fontWeight:700,
+          padding:"4px 12px",borderRadius:4,background:f.bg,color:f.color,border:`1.5px solid ${f.border}`}}>
+          {f.icon} {f.name}
+        </div>
+      ))}
+    </div>
+
+    {/* Per-user role selectors */}
+    <div style={{display:"flex",flexDirection:"column",gap:10}}>
+      {uList.map(u=>{
+        const current=NARRATIVE_ROLES[u.narrativeRole];
+        const fac=current?NARRATIVE_FACTIONS[current.faction]:null;
+        return <div key={u.id} style={{background:T.bgMid,border:`1.5px solid ${fac?.border||T.border2}`,borderRadius:7,padding:"12px 14px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+          <Avatar name={u.name} picture={u.picture} size={34}/>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontFamily:"'Cinzel',serif",fontSize:13,fontWeight:700,color:T.text}}>{u.name}</div>
+            {current
+              ?<div style={{fontSize:11,color:fac?.color||T.muted,marginTop:2}}>{current.icon} {current.title}</div>
+              :<div style={{fontSize:11,color:T.hint,marginTop:2,fontStyle:"italic"}}>No role assigned</div>
+            }
+          </div>
+          <select
+            value={u.narrativeRole||""}
+            onChange={e=>doAssignNarrativeRole(u.id,e.target.value||null)}
+            style={{fontFamily:"inherit",fontSize:12,padding:"6px 10px",borderRadius:5,
+              background:T.surface2,color:T.text,border:`1.5px solid ${T.border2}`,cursor:"pointer",maxWidth:220}}>
+            <option value="">— No role —</option>
+            {factions.map(([fKey,f])=>(
+              <optgroup key={fKey} label={`${f.icon} ${f.name}`}>
+                {roles.filter(([,r])=>r.faction===fKey).map(([rKey,r])=>(
+                  <option key={rKey} value={rKey}>{r.icon} {r.title}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>;
+      })}
+    </div>
+  </div>;
+}
+
+// ── Narrative Dossier (player view) ──────────────────────────────────────────
+export function NarrativeDossier({ctx}){
+  const {profile,authUser,users}=ctx;
+  // Read the live user doc: `profile` is loaded once at sign-in, so it would miss a role assigned afterwards
+  const me=(authUser&&users?.[authUser.uid])||profile;
+  const roleKey=me?.narrativeRole;
+  const role=roleKey?NARRATIVE_ROLES[roleKey]:null;
+  const fac=role?NARRATIVE_FACTIONS[role.faction]:null;
+  const [revealed,setRevealed]=useState(false);
+
+  if(!role){
+    return <div className="cc-fade">
+      <SectionTitle sub="Your classified mission briefing">Dossier</SectionTitle>
+      <Card style={{textAlign:"center",padding:"48px 24px"}}>
+        <div style={{fontSize:52,marginBottom:14}}>🔒</div>
+        <h3 style={{fontFamily:"'Cinzel',serif",fontSize:16,color:T.amber,marginBottom:8}}>No Dossier Assigned</h3>
+        <p style={{fontSize:13,color:T.muted,lineHeight:1.7,maxWidth:340,margin:"0 auto"}}>
+          Your mission briefing hasn't been issued yet. The Engine Room officer will assign your role before the operation begins. Check back soon.
+        </p>
+      </Card>
+    </div>;
+  }
+
+  return <div className="cc-fade">
+    <SectionTitle sub="Your classified mission briefing — eyes only">Dossier</SectionTitle>
+
+    {/* Sealed dossier — tap to reveal */}
+    {!revealed
+      ?<div onClick={()=>setRevealed(true)} style={{cursor:"pointer"}}><Card style={{textAlign:"center",padding:"52px 24px",border:`2px solid ${fac.border}`,background:fac.bg}}>
+        <div style={{fontSize:56,marginBottom:16}}>📁</div>
+        <div style={{fontFamily:"'Cinzel',serif",fontSize:13,fontWeight:700,color:fac.color,marginBottom:6,letterSpacing:".08em",textTransform:"uppercase"}}>
+          {fac.icon} {fac.name} — Classified
+        </div>
+        <div style={{fontSize:12,color:T.muted,marginBottom:24}}>This dossier is sealed. Tap to open — make sure no one is looking over your shoulder.</div>
+        <button style={{fontFamily:"'Cinzel',serif",fontSize:13,fontWeight:700,padding:"12px 28px",
+          borderRadius:6,border:`2px solid ${fac.border}`,background:fac.bg,color:fac.color,cursor:"pointer"}}>
+          🔓 Open Your Dossier
+        </button>
+      </Card></div>
+
+      :<div style={{animation:"ccFadeIn .2s ease"}}>
+        {/* Header card */}
+        <Card style={{marginBottom:14,border:`2.5px solid ${fac.border}`,background:fac.bg,
+          boxShadow:`0 0 24px ${fac.glow}33`}}>
+          <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16,flexWrap:"wrap"}}>
+            <div style={{fontSize:52,lineHeight:1}}>{role.icon}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:10,fontWeight:700,letterSpacing:".1em",textTransform:"uppercase",
+                color:fac.color,marginBottom:4,fontFamily:"'Cinzel',serif"}}>{fac.icon} {fac.name}</div>
+              <div style={{fontFamily:"'Cinzel',serif",fontSize:18,fontWeight:700,color:T.text,lineHeight:1.2}}>{role.title}</div>
+              <div style={{fontSize:12,color:T.muted,marginTop:4,fontStyle:"italic"}}>{role.subtitle}</div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <div style={{flex:1,minWidth:180,background:T.bgMid,borderRadius:6,padding:"10px 14px",border:`1px solid ${T.border}`}}>
+              <div style={{fontSize:10,color:T.hint,fontWeight:700,textTransform:"uppercase",letterSpacing:".06em",marginBottom:4}}>Cover Story</div>
+              <div style={{fontSize:12,color:T.muted,lineHeight:1.5}}>{role.cover}</div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Secret briefing */}
+        <Card style={{marginBottom:14,border:`1.5px solid ${fac.border}44`}}>
+          <div style={{fontSize:11,fontWeight:700,color:fac.color,textTransform:"uppercase",letterSpacing:".08em",marginBottom:10,fontFamily:"'Cinzel',serif"}}>
+            🔐 Secret Briefing
+          </div>
+          <p style={{fontSize:13,color:T.text,lineHeight:1.8,margin:0,borderLeft:`3px solid ${fac.border}`,paddingLeft:14}}>
+            {role.secret}
+          </p>
+        </Card>
+
+        {/* Objectives */}
+        <Card style={{marginBottom:14,border:`1.5px solid ${fac.border}44`}}>
+          <div style={{fontSize:11,fontWeight:700,color:fac.color,textTransform:"uppercase",letterSpacing:".08em",marginBottom:12,fontFamily:"'Cinzel',serif"}}>
+            🎯 Mission Objectives
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {role.objectives.map((obj,i)=>(
+              <div key={i} style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                <div style={{width:22,height:22,borderRadius:4,border:`1.5px solid ${fac.border}`,
+                  background:fac.bg,display:"flex",alignItems:"center",justifyContent:"center",
+                  fontSize:11,fontWeight:700,color:fac.color,flexShrink:0,fontFamily:"'Cinzel',serif"}}>
+                  {i+1}
+                </div>
+                <span style={{fontSize:13,color:T.text,lineHeight:1.6,paddingTop:2}}>{obj}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* Field intelligence note */}
+        <Card style={{border:`1.5px solid ${T.amber}44`,background:T.bgMid}}>
+          <div style={{fontSize:11,fontWeight:700,color:T.amber,textTransform:"uppercase",letterSpacing:".08em",marginBottom:8,fontFamily:"'Cinzel',serif"}}>
+            ⚠️ Field Intelligence
+          </div>
+          <p style={{fontSize:12,color:T.muted,lineHeight:1.7,margin:0,fontStyle:"italic"}}>
+            {role.suspectHint}
+          </p>
+        </Card>
+
+        {/* Reseal button */}
+        <div style={{textAlign:"center",marginTop:18}}>
+          <button onClick={()=>setRevealed(false)}
+            style={{fontFamily:"'Cinzel',serif",fontSize:11,fontWeight:700,padding:"8px 20px",
+              borderRadius:5,border:`1.5px solid ${T.border2}`,background:"transparent",
+              color:T.muted,cursor:"pointer",letterSpacing:".05em"}}>
+            🔒 Seal Dossier
+          </button>
+        </div>
+      </div>
+    }
+  </div>;
 }
 
 // ── Itinerary Editor ──────────────────────────────────────────────────────────
