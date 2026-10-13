@@ -2,7 +2,7 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { NarrativeDossier, NarrativeManager, CaptainsLog, NARRATIVE_ROLES, NARRATIVE_FACTIONS, pickRandomRoles } from '../App.jsx'
+import { NarrativeDossier, NarrativeManager, CaptainsLog, NARRATIVE_ROLES, NARRATIVE_FACTIONS, pickRandomRoles, scoreGuesses } from '../App.jsx'
 
 describe('narrative data', () => {
   it('gives every role a valid faction and a complete briefing', () => {
@@ -289,7 +289,7 @@ describe('Crew suspect board (inside the dossier)', () => {
     for (const f of Object.values(NARRATIVE_FACTIONS)) {
       expect(within(select).getByRole('group', { name: `${f.icon} ${f.name}` })).toBeInTheDocument()
     }
-    expect(within(select).getAllByRole('option')).toHaveLength(Object.keys(NARRATIVE_ROLES).length + 1)
+    expect(within(select).getAllByRole('option')).toHaveLength(Object.keys(NARRATIVE_ROLES).length + 2) // + Unknown, + Not playing
     await user.selectOptions(select, 'smuggler')
     expect(select).toHaveValue('smuggler')
     expect(screen.getByText('1 of 2 marked')).toBeInTheDocument()
@@ -346,5 +346,165 @@ describe('Crew suspect board (inside the dossier)', () => {
   it('says so when nobody else has joined', async () => {
     await renderOpen({ users: { u1: { name: 'Ana', narrativeRole: 'rebel_spy' } } })
     expect(screen.getByText('No other crew have joined yet.')).toBeInTheDocument()
+  })
+})
+
+describe('scoreGuesses', () => {
+  const users = {
+    me: { narrativeRole: 'rebel_spy' },
+    a: { narrativeRole: 'smuggler' },
+    b: { narrativeRole: 'imperial_agent' },
+    c: {},
+  }
+
+  it('counts only exact matches and excludes the player', () => {
+    expect(scoreGuesses({ a: 'smuggler', b: 'rebel_spy', c: 'none' }, users, 'me')).toEqual({ correct: 2, total: 3 })
+  })
+
+  it('treats a crew member with no role as "none", and never as a role', () => {
+    expect(scoreGuesses({ a: 'smuggler', b: 'imperial_agent', c: 'smuggler' }, users, 'me')).toEqual({ correct: 2, total: 3 })
+  })
+
+  it('counts missing guesses as wrong and an empty crew as 0 of 0', () => {
+    expect(scoreGuesses({}, users, 'me')).toEqual({ correct: 0, total: 3 })
+    expect(scoreGuesses({}, { me: {} }, 'me')).toEqual({ correct: 0, total: 0 })
+  })
+})
+
+describe('Crew suspect board check', () => {
+  const me = { uid: 'u1' }
+  const users = {
+    u1: { name: 'Ana', narrativeRole: 'rebel_spy' },
+    u2: { name: 'Ben', narrativeRole: 'smuggler' },
+    u3: { name: 'Cleo', narrativeRole: 'imperial_agent' },
+  }
+  const ctxFor = (u, authUser = me) => ({ authUser, profile: {}, users: u })
+  const open = async (u = users, authUser = me) => {
+    const user = userEvent.setup()
+    const utils = render(<NarrativeDossier ctx={ctxFor(u, authUser)} />)
+    await user.click(screen.getByRole('button', { name: /open your dossier/i }))
+    return { user, ...utils }
+  }
+  const guess = (user, name, value) => user.selectOptions(screen.getByLabelText(`Guess role for ${name}`), value)
+  const checkBtn = () => screen.getByRole('button', { name: /check my guesses/i })
+
+  beforeEach(() => localStorage.clear())
+
+  it('stays disabled until every crew member has a guess, and says how many are left', async () => {
+    const { user } = await open()
+    expect(checkBtn()).toBeDisabled()
+    expect(screen.getByText(/2 to go/)).toBeInTheDocument()
+    await guess(user, 'Ben', 'smuggler')
+    expect(checkBtn()).toBeDisabled()
+    expect(screen.getByText(/1 to go/)).toBeInTheDocument()
+    await guess(user, 'Cleo', 'imperial_agent')
+    expect(checkBtn()).toBeEnabled()
+    expect(screen.queryByText(/to go/)).not.toBeInTheDocument()
+  })
+
+  it('does nothing when clicked before every guess is in', async () => {
+    const { user } = await open()
+    await guess(user, 'Ben', 'smuggler')
+    await user.click(checkBtn())
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.getByText(/Checks made: 0/)).toBeInTheDocument()
+  })
+
+  it('reports how many guesses are correct against the assigned roles', async () => {
+    const { user } = await open()
+    await guess(user, 'Ben', 'smuggler')
+    await guess(user, 'Cleo', 'imperial_security')
+    await user.click(checkBtn())
+    expect(screen.getByRole('status')).toHaveTextContent('1 of 2 correct')
+    expect(screen.getByText(/Checks made: 1/)).toBeInTheDocument()
+  })
+
+  it('celebrates when every guess is right', async () => {
+    const { user } = await open()
+    await guess(user, 'Ben', 'smuggler')
+    await guess(user, 'Cleo', 'imperial_agent')
+    await user.click(checkBtn())
+    expect(screen.getByRole('status')).toHaveTextContent('All 2 correct')
+  })
+
+  it('gives only a count: it never says which guesses were right or wrong', async () => {
+    const { user } = await open()
+    await guess(user, 'Ben', 'smuggler')
+    await guess(user, 'Cleo', 'imperial_security')
+    await user.click(checkBtn())
+    expect(screen.getAllByRole('status')).toHaveLength(1)
+    expect(screen.getByLabelText('Guess role for Ben')).toHaveValue('smuggler')
+    expect(screen.getByLabelText('Guess role for Cleo')).toHaveValue('imperial_security')
+    expect(screen.queryByText(/wrong|incorrect/i)).not.toBeInTheDocument()
+  })
+
+  it('lets a player guess that someone has no role, scoring it against crew who really have none', async () => {
+    const withSpectator = { ...users, u4: { name: 'Dan' } }
+    const { user } = await open(withSpectator)
+    await guess(user, 'Ben', 'smuggler')
+    await guess(user, 'Cleo', 'imperial_agent')
+    await guess(user, 'Dan', 'none')
+    await user.click(checkBtn())
+    expect(screen.getByRole('status')).toHaveTextContent('All 3 correct')
+
+    await guess(user, 'Dan', 'smuggler')
+    await user.click(checkBtn())
+    expect(screen.getByRole('status')).toHaveTextContent('2 of 3 correct')
+  })
+
+  it('counts every check and lists the history, and remembers them after a reload', async () => {
+    const { user, unmount } = await open()
+    await guess(user, 'Ben', 'smuggler')
+    await guess(user, 'Cleo', 'imperial_security')
+    await user.click(checkBtn())
+    await guess(user, 'Cleo', 'imperial_agent')
+    await user.click(checkBtn())
+    expect(screen.getByText(/Checks made: 2/)).toHaveTextContent('history: 1/2, 2/2')
+    expect(screen.getByRole('status')).toHaveTextContent('All 2 correct')
+
+    unmount()
+    await open()
+    expect(screen.getByText(/Checks made: 2/)).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('All 2 correct')
+  })
+
+  it('scores against the roles as they are now, not as they were at the last check', async () => {
+    const { user, rerender } = await open()
+    await guess(user, 'Ben', 'smuggler')
+    await guess(user, 'Cleo', 'imperial_agent')
+    await user.click(checkBtn())
+    expect(screen.getByRole('status')).toHaveTextContent('All 2 correct')
+
+    rerender(<NarrativeDossier ctx={ctxFor({ ...users, u2: { name: 'Ben', narrativeRole: 'arms_dealer' } })} />)
+    await user.click(checkBtn())
+    expect(screen.getByRole('status')).toHaveTextContent('1 of 2 correct')
+  })
+
+  it("keeps each player's checks separate", async () => {
+    const { user, unmount } = await open()
+    await guess(user, 'Ben', 'smuggler')
+    await guess(user, 'Cleo', 'imperial_agent')
+    await user.click(checkBtn())
+    unmount()
+    await open(users, { uid: 'u3' })
+    expect(screen.getByText(/Checks made: 0/)).toBeInTheDocument()
+  })
+
+  it('ignores corrupt saved checks', async () => {
+    localStorage.setItem('cc-role-checks:u1', 'nope')
+    await open()
+    expect(screen.getByText(/Checks made: 0/)).toBeInTheDocument()
+  })
+
+  it('drops malformed saved entries but keeps valid ones', async () => {
+    localStorage.setItem('cc-role-checks:u1', JSON.stringify([{ correct: 'x' }, null, { correct: 1, total: 2 }]))
+    await open()
+    expect(screen.getByText(/Checks made: 1/)).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('1 of 2 correct')
+  })
+
+  it('has no check button when nobody else has joined', async () => {
+    await open({ u1: users.u1 })
+    expect(screen.queryByRole('button', { name: /check my guesses/i })).not.toBeInTheDocument()
   })
 })

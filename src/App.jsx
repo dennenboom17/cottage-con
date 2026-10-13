@@ -4254,19 +4254,52 @@ function saveGuesses(uid,g){
   try{ localStorage.setItem(guessKey(uid),JSON.stringify(g)); }catch{ /* storage blocked or full: notes just won't persist */ }
 }
 
+// Each check is stored as {correct,total}; the number of entries is how many checks the player has made.
+const checksKey = uid => `cc-role-checks:${uid}`;
+function loadChecks(uid){
+  try{
+    const v=JSON.parse(localStorage.getItem(checksKey(uid))||"[]");
+    return Array.isArray(v)?v.filter(r=>r&&Number.isInteger(r.correct)&&Number.isInteger(r.total)):[];
+  }catch{ return []; }
+}
+function saveChecks(uid,c){
+  try{ localStorage.setItem(checksKey(uid),JSON.stringify(c)); }catch{ /* storage blocked or full: the count just won't persist */ }
+}
+
+// Guess value for a crew member who was never given a role, so the board can't reveal who is playing.
+export const NOT_PLAYING = "none";
+
+// Scores guesses against the roles currently assigned. Returns a count only, never which guesses were right.
+export function scoreGuesses(guesses, users, selfUid){
+  const crew=Object.entries(users||{}).filter(([id])=>id!==selfUid);
+  const correct=crew.filter(([id,u])=>guesses?.[id]===(NARRATIVE_ROLES[u?.narrativeRole]?u.narrativeRole:NOT_PLAYING)).length;
+  return {correct,total:crew.length};
+}
+
 export function RoleGuessBoard({uid,users}){
   const [guesses,setGuesses]=useState(()=>loadGuesses(uid));
+  const [checks,setChecks]=useState(()=>loadChecks(uid));
   const crew=Object.entries(users||{}).filter(([id])=>id!==uid).map(([id,u])=>({...u,id}))
     .sort((a,b)=>(a.name||"").localeCompare(b.name||""));
   const factions=Object.entries(NARRATIVE_FACTIONS);
   const roles=Object.entries(NARRATIVE_ROLES);
-  const guessFor=id=>NARRATIVE_ROLES[guesses[id]]?guesses[id]:"";
+  const guessFor=id=>NARRATIVE_ROLES[guesses[id]]||guesses[id]===NOT_PLAYING?guesses[id]:"";
   const marked=crew.filter(c=>guessFor(c.id)).length;
+  const allMarked=crew.length>0&&marked===crew.length;
+  const last=checks[checks.length-1];
+  const perfect=!!last&&last.total>0&&last.correct===last.total;
   const setGuess=(id,roleKey)=>{
     const next={...guesses};
     if(roleKey) next[id]=roleKey; else delete next[id];
     saveGuesses(uid,next);
     setGuesses(next);
+  };
+  const runCheck=()=>{
+    if(!allMarked) return;
+    const valid=Object.fromEntries(crew.map(c=>[c.id,guessFor(c.id)]));
+    const next=[...checks,scoreGuesses(valid,users,uid)];
+    saveChecks(uid,next);
+    setChecks(next);
   };
 
   return <Card style={{marginTop:14,border:`1.5px solid ${T.border2}`}}>
@@ -4302,10 +4335,29 @@ export function RoleGuessBoard({uid,users}){
                   ))}
                 </optgroup>
               ))}
+              <option value={NOT_PLAYING}>🚫 Not playing (no role)</option>
             </select>
           </div>;
         })}
       </div>}
+
+    {crew.length>0&&<div style={{marginTop:14}}>
+      <Btn onClick={runCheck} disabled={!allMarked} style={{width:"100%"}}>
+        <i className="ti ti-checks"/> Check my guesses
+      </Btn>
+      {!allMarked&&<div style={{fontSize:11,color:T.hint,marginTop:6,textAlign:"center"}}>
+        Mark all {crew.length} crew members to unlock the check — {crew.length-marked} to go.
+      </div>}
+      {last&&<div role="status" style={{marginTop:10,padding:"10px 14px",borderRadius:6,textAlign:"center",
+        border:`1.5px solid ${perfect?"#166534":T.amber}`,background:perfect?"#162A1E":T.bgMid,
+        color:perfect?"#4ADE80":T.amber,fontFamily:"'Cinzel',serif",fontSize:14,fontWeight:700}}>
+        {perfect?`🎉 All ${last.total} correct!`:`${last.correct} of ${last.total} correct`}
+      </div>}
+      <div style={{fontSize:11,color:T.hint,marginTop:8,textAlign:"center"}}>
+        Checks made: {checks.length}
+        {checks.length>1&&` · history: ${checks.map(r=>`${r.correct}/${r.total}`).join(", ")}`}
+      </div>
+    </div>}
   </Card>;
 }
 
