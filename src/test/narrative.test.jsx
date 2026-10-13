@@ -17,6 +17,29 @@ describe('narrative data', () => {
     }
   })
 
+  it('pairs each buyer and hunter role with the independent they target, on the right side', () => {
+    const expected = {
+      rebel_arms_buyer: ['rebellion', 'Freelance Arms Dealer'],
+      rebel_black_market_agent: ['rebellion', 'Black Market Smuggler'],
+      imperial_arms_hunter: ['empire', 'Freelance Arms Dealer'],
+      imperial_smuggler_hunter: ['empire', 'Black Market Smuggler'],
+    }
+    for (const [key, [faction, target]] of Object.entries(expected)) {
+      const r = NARRATIVE_ROLES[key]
+      expect(r, key).toBeTruthy()
+      expect(r.faction, `${key} faction`).toBe(faction)
+      expect(r.objectives[0], `${key} first objective`).toContain(target)
+    }
+    expect(NARRATIVE_ROLES.arms_dealer.title).toBe('Freelance Arms Dealer')
+    expect(NARRATIVE_ROLES.smuggler.title).toBe('Black Market Smuggler')
+  })
+
+  it('gives every role a distinct icon and title', () => {
+    const roles = Object.values(NARRATIVE_ROLES)
+    expect(new Set(roles.map(r => r.icon)).size).toBe(roles.length)
+    expect(new Set(roles.map(r => r.title)).size).toBe(roles.length)
+  })
+
   it('uses every faction at least once', () => {
     const used = new Set(Object.values(NARRATIVE_ROLES).map(r => r.faction))
     for (const f of Object.keys(NARRATIVE_FACTIONS)) expect(used.has(f), f).toBe(true)
