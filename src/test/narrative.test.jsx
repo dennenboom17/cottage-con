@@ -2,7 +2,7 @@ import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { NarrativeDossier, NarrativeManager, CaptainsLog, NARRATIVE_ROLES, NARRATIVE_FACTIONS } from '../App.jsx'
+import { NarrativeDossier, NarrativeManager, CaptainsLog, NARRATIVE_ROLES, NARRATIVE_FACTIONS, pickRandomRoles } from '../App.jsx'
 
 describe('narrative data', () => {
   it('gives every role a valid faction and a complete briefing', () => {
@@ -19,16 +19,17 @@ describe('narrative data', () => {
 
   it('pairs each buyer and hunter role with the independent they target, on the right side', () => {
     const expected = {
-      rebel_arms_buyer: ['rebellion', 'Freelance Arms Dealer'],
-      rebel_black_market_agent: ['rebellion', 'Black Market Smuggler'],
-      imperial_arms_hunter: ['empire', 'Freelance Arms Dealer'],
-      imperial_smuggler_hunter: ['empire', 'Black Market Smuggler'],
+      rebel_arms_buyer: ['rebellion', 'Freelance Arms Dealer', 'arms_dealer'],
+      rebel_black_market_agent: ['rebellion', 'Black Market Smuggler', 'smuggler'],
+      imperial_arms_hunter: ['empire', 'Freelance Arms Dealer', 'arms_dealer'],
+      imperial_smuggler_hunter: ['empire', 'Black Market Smuggler', 'smuggler'],
     }
-    for (const [key, [faction, target]] of Object.entries(expected)) {
+    for (const [key, [faction, target, targetKey]] of Object.entries(expected)) {
       const r = NARRATIVE_ROLES[key]
       expect(r, key).toBeTruthy()
       expect(r.faction, `${key} faction`).toBe(faction)
       expect(r.objectives[0], `${key} first objective`).toContain(target)
+      expect(r.requires, `${key} requires`).toBe(targetKey)
     }
     expect(NARRATIVE_ROLES.arms_dealer.title).toBe('Freelance Arms Dealer')
     expect(NARRATIVE_ROLES.smuggler.title).toBe('Black Market Smuggler')
@@ -40,9 +41,54 @@ describe('narrative data', () => {
     expect(new Set(roles.map(r => r.title)).size).toBe(roles.length)
   })
 
+  it('only requires roles that exist and have no requirement of their own', () => {
+    for (const [key, r] of Object.entries(NARRATIVE_ROLES)) {
+      if (!r.requires) continue
+      expect(NARRATIVE_ROLES[r.requires], `${key} requires ${r.requires}`).toBeTruthy()
+      expect(NARRATIVE_ROLES[r.requires].requires, `${r.requires} must not chain`).toBeUndefined()
+    }
+  })
+
   it('uses every faction at least once', () => {
     const used = new Set(Object.values(NARRATIVE_ROLES).map(r => r.faction))
     for (const f of Object.keys(NARRATIVE_FACTIONS)) expect(used.has(f), f).toBe(true)
+  })
+})
+
+describe('pickRandomRoles', () => {
+  const total = Object.keys(NARRATIVE_ROLES).length
+  const seeded = (seed) => () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296 }
+  const targetsPresent = (picks) => picks.every(k => !NARRATIVE_ROLES[k].requires || picks.includes(NARRATIVE_ROLES[k].requires))
+
+  it('never picks a buyer or hunter without the role it targets, for any group size', () => {
+    for (let count = 0; count <= total + 6; count++) {
+      for (let seed = 1; seed <= 150; seed++) {
+        const picks = pickRandomRoles(count, NARRATIVE_ROLES, seeded(seed))
+        expect(picks, `count ${count} seed ${seed}`).toHaveLength(count)
+        expect(targetsPresent(picks), `count ${count} seed ${seed}: ${picks}`).toBe(true)
+      }
+    }
+  })
+
+  it('gives everyone a different role while the group is no larger than the role list', () => {
+    for (let count = 1; count <= total; count++) {
+      const picks = pickRandomRoles(count, NARRATIVE_ROLES, seeded(count * 7))
+      expect(new Set(picks).size, `count ${count}`).toBe(count)
+    }
+  })
+
+  it('can still hand out the paired roles (they are not simply excluded)', () => {
+    const seen = new Set()
+    for (let seed = 1; seed <= 200; seed++) pickRandomRoles(6, NARRATIVE_ROLES, seeded(seed)).forEach(k => seen.add(k))
+    for (const k of ['rebel_arms_buyer', 'rebel_black_market_agent', 'imperial_arms_hunter', 'imperial_smuggler_hunter']) {
+      expect(seen.has(k), k).toBe(true)
+    }
+  })
+
+  it('repeats roles only once every role is in play', () => {
+    const picks = pickRandomRoles(total + 5, NARRATIVE_ROLES, seeded(3))
+    expect(new Set(picks).size).toBe(total)
+    expect(picks).toHaveLength(total + 5)
   })
 })
 
@@ -125,6 +171,16 @@ describe('NarrativeManager', () => {
     expect(ctx.doAssignNarrativeRole).toHaveBeenCalledWith('u2', null)
   })
 
+  it('warns when an assigned role has nobody to target', () => {
+    setup({ users: { u1: { name: 'Ana', narrativeRole: 'rebel_arms_buyer' }, u2: { name: 'Ben', narrativeRole: 'smuggler' } } })
+    expect(screen.getByText(/No Freelance Arms Dealer is assigned/)).toBeInTheDocument()
+  })
+
+  it('does not warn once the targeted role is assigned to someone', () => {
+    setup({ users: { u1: { name: 'Ana', narrativeRole: 'rebel_arms_buyer' }, u2: { name: 'Ben', narrativeRole: 'arms_dealer' } } })
+    expect(screen.queryByText(/is assigned, so this role has nobody to target/)).not.toBeInTheDocument()
+  })
+
   it('groups the role options under their faction', () => {
     setup()
     const [select] = screen.getAllByRole('combobox')
@@ -145,6 +201,10 @@ describe('NarrativeManager', () => {
     }
     const keys = ctx.doAssignNarrativeRole.mock.calls.map(c => c[1])
     expect(new Set(keys).size).toBe(2) // fewer crew than roles, so no one shares a role
+    for (const k of keys) {
+      const need = NARRATIVE_ROLES[k].requires
+      if (need) expect(keys, `${k} needs ${need}`).toContain(need)
+    }
     expect(ctx.showToast).toHaveBeenCalledTimes(1)
   })
 })

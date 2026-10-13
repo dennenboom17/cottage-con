@@ -190,6 +190,7 @@ export const NARRATIVE_ROLES = {
       "Keep your investigation hidden, or the dealer will go quiet",
     ],
     suspectHint:"Dealers and buyers avoid being seen together. Watch for private conversations and sudden changes of subject.",
+    requires:"arms_dealer",
     knowsFaction: false,
   },
   imperial_smuggler_hunter: {
@@ -206,6 +207,7 @@ export const NARRATIVE_ROLES = {
       "Do not reveal your badge until you are ready to act",
     ],
     suspectHint:"Smugglers sell to whoever pays. Notice who is suddenly very friendly with whom.",
+    requires:"smuggler",
     knowsFaction: false,
   },
   // ── REBELLION ────────────────────────────────────────────────────────────
@@ -287,6 +289,7 @@ export const NARRATIVE_ROLES = {
       "Report the completed purchase to your cell commander",
     ],
     suspectHint:"The dealer sells to anyone with credits. Make sure you are not the loudest one asking.",
+    requires:"arms_dealer",
     knowsFaction: false,
   },
   rebel_black_market_agent: {
@@ -303,6 +306,7 @@ export const NARRATIVE_ROLES = {
       "Deliver the goods to your cell commander",
     ],
     suspectHint:"The smuggler will take a better offer mid-voyage. Move fast, and pay before a rival does.",
+    requires:"smuggler",
     knowsFaction: false,
   },
   // ── INDEPENDENTS ─────────────────────────────────────────────────────────
@@ -355,6 +359,36 @@ export const NARRATIVE_ROLES = {
     knowsFaction: false,
   },
 };
+
+// Picks `count` role keys for random assignment. A role with `requires` (a buyer or hunter chasing an
+// independent) is only picked together with the role it targets, so nobody is handed a mission with no target.
+// Roles are unique while count <= number of roles; beyond that they repeat, which is safe because every role is then in play.
+export function pickRandomRoles(count, roles = NARRATIVE_ROLES, rand = Math.random) {
+  const shuffle = (arr) => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+  const all = Object.keys(roles);
+  const picked = [];
+  const pool = shuffle(all);
+  const missingTarget = (k) => { const t = roles[k].requires; return t && !picked.includes(t) ? t : null; };
+  while (picked.length < Math.min(count, all.length) && pool.length) {
+    const free = Math.min(count, all.length) - picked.length;
+    const i = pool.findIndex(k => !missingTarget(k) || free >= 2);
+    if (i < 0) break;
+    const [k] = pool.splice(i, 1);
+    const target = missingTarget(k);
+    if (target) { picked.push(target); pool.splice(pool.indexOf(target), 1); }
+    picked.push(k);
+  }
+  const extras = shuffle(all);
+  for (let n = 0; picked.length < count; n++) picked.push(extras[n % extras.length]);
+  return shuffle(picked);
+}
 
 const GAME_CATS = ["Light","Medium","Heavy","Party","2 Player"];
 const GAME_CAT_COLORS = {
@@ -4139,15 +4173,12 @@ export function NarrativeManager({ctx}){
   const uList=Object.entries(users).map(([id,u])=>({...u,id}));
   const factions=Object.entries(NARRATIVE_FACTIONS);
   const roles=Object.entries(NARRATIVE_ROLES);
+  const assigned=new Set(uList.map(u=>u.narrativeRole));
 
   const randomAssign=async()=>{
-    const shuffled=Object.keys(NARRATIVE_ROLES);
-    for(let i=shuffled.length-1;i>0;i--){
-      const j=Math.floor(Math.random()*(i+1));
-      [shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];
-    }
+    const picks=pickRandomRoles(uList.length);
     for(let i=0;i<uList.length;i++){
-      await doAssignNarrativeRole(uList[i].id,shuffled[i%shuffled.length],true);
+      await doAssignNarrativeRole(uList[i].id,picks[i],true);
     }
     showToast("🎭 Roles randomly assigned!");
   };
@@ -4178,6 +4209,7 @@ export function NarrativeManager({ctx}){
       {uList.map(u=>{
         const current=NARRATIVE_ROLES[u.narrativeRole];
         const fac=current?NARRATIVE_FACTIONS[current.faction]:null;
+        const noTarget=current?.requires&&!assigned.has(current.requires)?NARRATIVE_ROLES[current.requires].title:null;
         return <div key={u.id} style={{background:T.bgMid,border:`1.5px solid ${fac?.border||T.border2}`,borderRadius:7,padding:"12px 14px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
           <Avatar name={u.name} picture={u.picture} size={34}/>
           <div style={{flex:1,minWidth:0}}>
@@ -4186,6 +4218,7 @@ export function NarrativeManager({ctx}){
               ?<div style={{fontSize:11,color:fac?.color||T.muted,marginTop:2}}>{current.icon} {current.title}</div>
               :<div style={{fontSize:11,color:T.hint,marginTop:2,fontStyle:"italic"}}>No role assigned</div>
             }
+            {noTarget&&<div style={{fontSize:11,color:T.danger,marginTop:3}}>⚠️ No {noTarget} is assigned, so this role has nobody to target</div>}
           </div>
           <select
             value={u.narrativeRole||""}
