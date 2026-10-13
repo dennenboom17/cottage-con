@@ -2,8 +2,8 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { getDoc } from 'firebase/firestore'
-import { NarrativeDossier, NarrativeManager, CaptainsLog, NARRATIVE_ROLES, NARRATIVE_FACTIONS, pickRandomRoles, scoreGuesses, pickChatTip, HUSS_TIP, CrewAssistant, resetBggMatcher } from '../App.jsx'
+import { getDoc, setDoc } from 'firebase/firestore'
+import { NarrativeDossier, NarrativeManager, CaptainsLog, NARRATIVE_ROLES, NARRATIVE_FACTIONS, pickRandomRoles, scoreGuesses, nextSuspectScore, rankSuspectScores, recordSuspectCheck, SuspectLeaderboard, pickChatTip, HUSS_TIP, CrewAssistant, resetBggMatcher } from '../App.jsx'
 
 describe('narrative data', () => {
   it('gives every role a valid faction and a complete briefing', () => {
@@ -387,17 +387,28 @@ describe('Crew suspect board check', () => {
     u2: { name: 'Ben', narrativeRole: 'smuggler' },
     u3: { name: 'Cleo', narrativeRole: 'imperial_agent' },
   }
-  const ctxFor = (u, authUser = me) => ({ authUser, profile: {}, users: u })
+
+  // Stand-in for App + Firestore: `store` plays the suspectScores collection and outlives remounts, like the real one.
+  let store, recorded
+  function Harness({ u = users, authUser = me }) {
+    const [scores, setScores] = React.useState(store)
+    const doRecordSuspectCheck = async (result) => {
+      recorded.push(result)
+      store = { ...store, [authUser.uid]: nextSuspectScore(store[authUser.uid], result, 1000) }
+      setScores(store)
+    }
+    return <NarrativeDossier ctx={{ authUser, profile: {}, users: u, suspectScores: scores, doRecordSuspectCheck }} />
+  }
   const open = async (u = users, authUser = me) => {
     const user = userEvent.setup()
-    const utils = render(<NarrativeDossier ctx={ctxFor(u, authUser)} />)
+    const utils = render(<Harness u={u} authUser={authUser} />)
     await user.click(screen.getByRole('button', { name: /open your dossier/i }))
     return { user, ...utils }
   }
   const guess = (user, name, value) => user.selectOptions(screen.getByLabelText(`Guess role for ${name}`), value)
   const checkBtn = () => screen.getByRole('button', { name: /check my guesses/i })
 
-  beforeEach(() => localStorage.clear())
+  beforeEach(() => { localStorage.clear(); store = {}; recorded = [] })
 
   it('stays disabled until every crew member has a guess, and says how many are left', async () => {
     const { user } = await open()
@@ -417,15 +428,17 @@ describe('Crew suspect board check', () => {
     await user.click(checkBtn())
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
     expect(screen.getByText(/Checks made: 0/)).toBeInTheDocument()
+    expect(recorded).toEqual([])
   })
 
-  it('reports how many guesses are correct against the assigned roles', async () => {
+  it('reports how many guesses are correct, and records that result for the leaderboard', async () => {
     const { user } = await open()
     await guess(user, 'Ben', 'smuggler')
     await guess(user, 'Cleo', 'imperial_security')
     await user.click(checkBtn())
     expect(screen.getByRole('status')).toHaveTextContent('1 of 2 correct')
     expect(screen.getByText(/Checks made: 1/)).toBeInTheDocument()
+    expect(recorded).toEqual([{ correct: 1, total: 2 }])
   })
 
   it('celebrates when every guess is right', async () => {
@@ -461,7 +474,7 @@ describe('Crew suspect board check', () => {
     expect(screen.getByRole('status')).toHaveTextContent('2 of 3 correct')
   })
 
-  it('counts every check and lists the history, and remembers them after a reload', async () => {
+  it('counts every check and lists the history, and still has them after a reload', async () => {
     const { user, unmount } = await open()
     await guess(user, 'Ben', 'smuggler')
     await guess(user, 'Cleo', 'imperial_security')
@@ -484,7 +497,7 @@ describe('Crew suspect board check', () => {
     await user.click(checkBtn())
     expect(screen.getByRole('status')).toHaveTextContent('All 2 correct')
 
-    rerender(<NarrativeDossier ctx={ctxFor({ ...users, u2: { name: 'Ben', narrativeRole: 'arms_dealer' } })} />)
+    rerender(<Harness u={{ ...users, u2: { name: 'Ben', narrativeRole: 'arms_dealer' } }} />)
     await user.click(checkBtn())
     expect(screen.getByRole('status')).toHaveTextContent('1 of 2 correct')
   })
@@ -499,15 +512,10 @@ describe('Crew suspect board check', () => {
     expect(screen.getByText(/Checks made: 0/)).toBeInTheDocument()
   })
 
-  it('ignores corrupt saved checks', async () => {
-    localStorage.setItem('cc-role-checks:u1', 'nope')
-    await open()
-    expect(screen.getByText(/Checks made: 0/)).toBeInTheDocument()
-  })
-
-  it('drops malformed saved entries but keeps valid ones', async () => {
-    localStorage.setItem('cc-role-checks:u1', JSON.stringify([{ correct: 'x' }, null, { correct: 1, total: 2 }]))
-    await open()
+  it('copes with a malformed saved score, keeping only the valid history', async () => {
+    const bad = { u1: { checks: 'x', history: [{ correct: 'x' }, null, { correct: 1, total: 2 }] } }
+    render(<NarrativeDossier ctx={{ authUser: me, profile: {}, users, suspectScores: bad }} />)
+    await userEvent.setup().click(screen.getByRole('button', { name: /open your dossier/i }))
     expect(screen.getByText(/Checks made: 1/)).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('1 of 2 correct')
   })
@@ -515,6 +523,177 @@ describe('Crew suspect board check', () => {
   it('has no check button when nobody else has joined', async () => {
     await open({ u1: users.u1 })
     expect(screen.queryByRole('button', { name: /check my guesses/i })).not.toBeInTheDocument()
+  })
+
+  it('shows the leaderboard inside the unlocked dossier, with the viewer highlighted', async () => {
+    store = { u1: nextSuspectScore(undefined, { correct: 1, total: 2 }), u2: nextSuspectScore(undefined, { correct: 2, total: 2 }) }
+    await open()
+    expect(screen.getByText(/Leaderboard/)).toBeInTheDocument()
+    expect(screen.getByText('(you)')).toBeInTheDocument()
+    expect(screen.getByText(/🎉 2\/2/)).toBeInTheDocument()
+  })
+})
+
+describe('nextSuspectScore', () => {
+  it('starts a record on the first check', () => {
+    expect(nextSuspectScore(undefined, { correct: 2, total: 5 }, 99)).toEqual({
+      checks: 1, history: [{ correct: 2, total: 5 }],
+      bestCorrect: 2, bestTotal: 5, lastCorrect: 2, lastTotal: 5, solvedInChecks: null, updatedAt: 99,
+    })
+  })
+
+  it('counts every check and keeps the best one, judged as a share of the crew', () => {
+    let rec = nextSuspectScore(undefined, { correct: 3, total: 7 })
+    rec = nextSuspectScore(rec, { correct: 4, total: 6 })
+    expect([rec.bestCorrect, rec.bestTotal, rec.checks]).toEqual([4, 6, 2])
+    rec = nextSuspectScore(rec, { correct: 3, total: 7 }) // worse: best must not move
+    expect([rec.bestCorrect, rec.bestTotal, rec.checks, rec.lastCorrect]).toEqual([4, 6, 3, 3])
+    rec = nextSuspectScore(rec, { correct: 5, total: 7 })
+    expect([rec.bestCorrect, rec.bestTotal]).toEqual([5, 7])
+  })
+
+  it('prefers more correct answers when the shares are equal', () => {
+    let rec = nextSuspectScore(undefined, { correct: 1, total: 2 })
+    rec = nextSuspectScore(rec, { correct: 3, total: 6 })
+    expect([rec.bestCorrect, rec.bestTotal]).toEqual([3, 6])
+  })
+
+  it('records the check that first cracked everyone and never moves it', () => {
+    let rec = nextSuspectScore(undefined, { correct: 1, total: 3 })
+    rec = nextSuspectScore(rec, { correct: 3, total: 3 })
+    rec = nextSuspectScore(rec, { correct: 3, total: 3 })
+    expect(rec.solvedInChecks).toBe(2)
+  })
+
+  it('keeps counting checks after the history is trimmed', () => {
+    const history = Array.from({ length: 50 }, () => ({ correct: 1, total: 2 }))
+    const rec = nextSuspectScore({ checks: 60, history, bestCorrect: 1, bestTotal: 2 }, { correct: 2, total: 2 })
+    expect(rec.checks).toBe(61)
+    expect(rec.history).toHaveLength(50)
+    expect(rec.history.at(-1)).toEqual({ correct: 2, total: 2 })
+  })
+
+  it('copes with a missing or corrupt previous record', () => {
+    for (const prev of [null, 'junk', 42, {}, { checks: 'x', history: 'nope', bestCorrect: 'a' }, { checks: -3, history: [null] }]) {
+      const rec = nextSuspectScore(prev, { correct: 1, total: 2 })
+      expect(rec.checks, JSON.stringify(prev)).toBe(1)
+      expect(rec.history).toEqual([{ correct: 1, total: 2 }])
+      expect([rec.bestCorrect, rec.bestTotal]).toEqual([1, 2])
+    }
+  })
+
+  it('never lets the check count fall below the history it holds', () => {
+    const history = [{ correct: 1, total: 2 }, { correct: 2, total: 2 }]
+    expect(nextSuspectScore({ checks: 1, history }, { correct: 0, total: 2 }).checks).toBe(3)
+  })
+})
+
+describe('rankSuspectScores', () => {
+  const users = { u1: { name: 'Ana' }, u2: { name: 'Ben' }, u3: { name: 'Cleo' }, u4: { name: 'Dan' } }
+  const rec = (checks, bestCorrect, bestTotal, extra = {}) => ({ checks, bestCorrect, bestTotal, history: [], updatedAt: 1, ...extra })
+  const order = (rows) => rows.map(r => r.name)
+
+  it('orders by best check as a share of the crew', () => {
+    const rows = rankSuspectScores({ u1: rec(1, 3, 7), u2: rec(1, 6, 7), u3: rec(1, 4, 7) }, users)
+    expect(order(rows)).toEqual(['Ben', 'Cleo', 'Ana'])
+    expect(rows.map(r => r.rank)).toEqual([1, 2, 3])
+  })
+
+  it('judges a smaller crew fairly: 4 of 5 beats 4 of 7', () => {
+    expect(order(rankSuspectScores({ u1: rec(1, 4, 7), u2: rec(1, 4, 5) }, users))).toEqual(['Ben', 'Ana'])
+  })
+
+  it('breaks a tie in favour of whoever needed fewer checks', () => {
+    const rows = rankSuspectScores({ u1: rec(5, 7, 7), u2: rec(2, 7, 7) }, users)
+    expect(order(rows)).toEqual(['Ben', 'Ana'])
+    expect(rows.map(r => r.rank)).toEqual([1, 2])
+  })
+
+  it('gives identical results the same rank and skips the next one', () => {
+    const rows = rankSuspectScores({ u1: rec(2, 5, 7), u2: rec(2, 5, 7), u3: rec(2, 3, 7) }, users)
+    expect(rows.map(r => r.rank)).toEqual([1, 1, 3])
+  })
+
+  it('puts whoever got there first ahead within a tie, without changing the rank', () => {
+    const rows = rankSuspectScores({ u1: rec(2, 5, 7, { updatedAt: 500 }), u2: rec(2, 5, 7, { updatedAt: 100 }) }, users)
+    expect(order(rows)).toEqual(['Ben', 'Ana'])
+    expect(rows.map(r => r.rank)).toEqual([1, 1])
+  })
+
+  it('leaves out people with no checks, malformed records, or who are no longer in the crew', () => {
+    const rows = rankSuspectScores({
+      u1: rec(0, 0, 7), u2: { checks: 'x', bestCorrect: 1, bestTotal: 2 }, u3: rec(1, 9, 2),
+      ghost: rec(3, 7, 7), u4: rec(1, 1, 7),
+    }, users)
+    expect(order(rows)).toEqual(['Dan'])
+  })
+
+  it('handles no scores at all', () => {
+    expect(rankSuspectScores(undefined, users)).toEqual([])
+    expect(rankSuspectScores({}, undefined)).toEqual([])
+  })
+
+  it('does not divide by zero when a best check had an empty crew', () => {
+    expect(() => rankSuspectScores({ u1: rec(1, 0, 0), u2: rec(1, 1, 2) }, users)).not.toThrow()
+    expect(order(rankSuspectScores({ u1: rec(1, 0, 0), u2: rec(1, 1, 2) }, users))).toEqual(['Ben', 'Ana'])
+  })
+})
+
+describe('SuspectLeaderboard', () => {
+  const users = { u1: { name: 'Ana' }, u2: { name: 'Ben' }, u3: { name: 'Cleo' } }
+  const rec = (checks, bestCorrect, bestTotal, extra = {}) => ({ checks, bestCorrect, bestTotal, history: [], updatedAt: 1, ...extra })
+
+  it('shows an empty state before anyone has checked', () => {
+    render(<SuspectLeaderboard scores={{}} users={users} uid="u1" />)
+    expect(screen.getByText(/be the first/i)).toBeInTheDocument()
+  })
+
+  it('lists players best-first with their best check and number of checks', () => {
+    render(<SuspectLeaderboard scores={{ u1: rec(3, 5, 7), u2: rec(1, 7, 7, { solvedInChecks: 1 }), u3: rec(2, 5, 7) }} users={users} uid="u1" />)
+    expect(screen.getAllByText(/^(Ana|Ben|Cleo)$/).map(el => el.textContent.replace('(you)', ''))).toEqual(['Ben', 'Cleo', 'Ana'])
+    expect(screen.getByText('🎉 7/7')).toBeInTheDocument()
+    expect(screen.getByText('1 check')).toBeInTheDocument()
+    expect(screen.getByText('2 checks')).toBeInTheDocument()
+    expect(screen.getByText('3 checks')).toBeInTheDocument()
+    expect(screen.getByText('🥇')).toBeInTheDocument()
+    expect(screen.getByText('🥈')).toBeInTheDocument()
+    expect(screen.getByText('🥉')).toBeInTheDocument()
+  })
+
+  it('marks the viewer, and nobody else', () => {
+    render(<SuspectLeaderboard scores={{ u1: rec(1, 1, 2), u2: rec(1, 1, 2) }} users={users} uid="u2" />)
+    expect(screen.getAllByText('(you)')).toHaveLength(1)
+    expect(screen.getByText('Ben').parentElement).toHaveTextContent('(you)')
+  })
+
+  it('shows tied players with the same medal', () => {
+    render(<SuspectLeaderboard scores={{ u1: rec(2, 5, 7), u2: rec(2, 5, 7) }} users={users} uid="u3" />)
+    expect(screen.getAllByText('🥇')).toHaveLength(2)
+  })
+})
+
+describe('recordSuspectCheck', () => {
+  it("merge-writes the player's next record to their own suspectScores doc", async () => {
+    const prev = nextSuspectScore(undefined, { correct: 1, total: 3 }, 5)
+    const written = await recordSuspectCheck('u1', prev, { correct: 3, total: 3 })
+    expect(setDoc).toHaveBeenCalledTimes(1)
+    const [ref, data, opts] = setDoc.mock.calls[0]
+    expect(ref).toEqual({ col: 'suspectScores', id: 'u1' })
+    expect(opts).toEqual({ merge: true })
+    expect(data).toEqual(written)
+    expect([data.checks, data.bestCorrect, data.solvedInChecks]).toEqual([2, 3, 2])
+  })
+
+  it('writes nothing without a user or with an impossible result', async () => {
+    for (const [uid, result] of [[undefined, { correct: 1, total: 2 }], ['u1', { correct: 3, total: 2 }], ['u1', null], ['u1', { correct: 'x', total: 2 }]]) {
+      expect(await recordSuspectCheck(uid, {}, result)).toBeNull()
+    }
+    expect(setDoc).not.toHaveBeenCalled()
+  })
+
+  it('lets a failed write reach the caller so it can warn the player', async () => {
+    setDoc.mockRejectedValueOnce(new Error('permission-denied'))
+    await expect(recordSuspectCheck('u1', {}, { correct: 1, total: 2 })).rejects.toThrow('permission-denied')
   })
 })
 

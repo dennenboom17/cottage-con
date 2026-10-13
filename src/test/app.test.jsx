@@ -5,7 +5,7 @@ import { onAuthStateChanged } from 'firebase/auth'
 import { getDoc, setDoc, onSnapshot } from 'firebase/firestore'
 import App from '../App.jsx'
 
-const COLLECTIONS = ['users', 'games', 'food', 'supplies', 'voyageMenu', 'deckHands', 'receipts', 'itinerary', 'settings', 'notifications']
+const COLLECTIONS = ['users', 'games', 'food', 'supplies', 'voyageMenu', 'deckHands', 'receipts', 'itinerary', 'suspectScores', 'settings', 'notifications']
 
 const user = { uid: 'me', email: 'ann@example.com', emailVerified: true, displayName: 'Ann Lee' }
 const profileDoc = (over = {}) => ({ id: 'me', name: 'Ann Lee', email: 'ann@example.com', onboarded: true, crewRank: 'Enlisted', loginHistory: [], ...over })

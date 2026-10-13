@@ -1514,6 +1514,7 @@ export default function App(){
   const [itinerary,    setItinerary]    = useState({});
   const [costSettings, setCostSettings] = useState({});
   const [itinMeta,    setItinMeta]    = useState({});
+  const [suspectScores, setSuspectScores] = useState({});
   const [view,      setView]      = useState("login");
   const [toast,    setToast]    = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1553,6 +1554,7 @@ export default function App(){
       subCol("deckHands",  setDeckHands),
       subCol("receipts",   setReceipts),
       subCol("itinerary",  setItinerary),
+      subCol("suspectScores", setSuspectScores),
       subCol("settings",   d=>{setCostSettings(d?.costCalc||{});setItinMeta(d?.itinMeta||{});}),
       onSnapshot(collection(db,"notifications"), s=>{
         // Listen for new notifications and show in-app toast for current user.
@@ -1693,6 +1695,13 @@ export default function App(){
     showToast(value ? "💰 Deposit marked received!" : "Deposit cleared.");
   };
 
+  // Adds one suspect-board check to the shared leaderboard (suspectScores/<uid>)
+  const doRecordSuspectCheck = async (result) => {
+    if(!authUser) return;
+    try{ await recordSuspectCheck(authUser.uid, suspectScores[authUser.uid], result); }
+    catch(e){ console.error("[suspectScores] save failed:", e); showToast("⚠️ Couldn't save your score. Check your connection and try again."); }
+  };
+
   // Narrative role assignment — engine room only (quiet skips the toast, for bulk assignment)
   const doAssignNarrativeRole = async (userId, roleKey, quiet=false) => {
     if(!users[userId]) return;
@@ -1716,7 +1725,7 @@ export default function App(){
     doSaveFood,doDelFood,doSaveSupply,doDelSupply,
     doSaveMenuItem,doDelMenuItem,doClaimSlot,doUnclaimSlot,doInitDeckHands,
     doSaveReceipt,doDelReceipt,
-    doSaveItinDay,doDelItinDay,doSaveDeckSlot,doDelDeckSlot,doSetDeposit,doSetRank,doSendNotification,doSaveCostSettings,costSettings,doSaveItinMeta,itinMeta,doAssignNarrativeRole,
+    doSaveItinDay,doDelItinDay,doSaveDeckSlot,doDelDeckSlot,doSetDeposit,doSetRank,doSendNotification,doSaveCostSettings,costSettings,doSaveItinMeta,itinMeta,doAssignNarrativeRole,suspectScores,doRecordSuspectCheck,
     notifPerm,notifSupported,requestPermission};
 
   return <>
@@ -4332,18 +4341,6 @@ function saveGuesses(uid,g){
   try{ localStorage.setItem(guessKey(uid),JSON.stringify(g)); }catch{ /* storage blocked or full: notes just won't persist */ }
 }
 
-// Each check is stored as {correct,total}; the number of entries is how many checks the player has made.
-const checksKey = uid => `cc-role-checks:${uid}`;
-function loadChecks(uid){
-  try{
-    const v=JSON.parse(localStorage.getItem(checksKey(uid))||"[]");
-    return Array.isArray(v)?v.filter(r=>r&&Number.isInteger(r.correct)&&Number.isInteger(r.total)):[];
-  }catch{ return []; }
-}
-function saveChecks(uid,c){
-  try{ localStorage.setItem(checksKey(uid),JSON.stringify(c)); }catch{ /* storage blocked or full: the count just won't persist */ }
-}
-
 // Guess value for a crew member who was never given a role, so the board can't reveal who is playing.
 export const NOT_PLAYING = "none";
 
@@ -4354,9 +4351,87 @@ export function scoreGuesses(guesses, users, selfUid){
   return {correct,total:crew.length};
 }
 
-export function RoleGuessBoard({uid,users}){
+const MAX_SCORE_HISTORY = 50;
+const isCheckResult = r => !!r && Number.isInteger(r.correct) && Number.isInteger(r.total) && r.correct >= 0 && r.correct <= r.total;
+const bestRatio = r => r.bestTotal > 0 ? r.bestCorrect / r.bestTotal : 0;
+
+// A player's shared leaderboard record (Firestore `suspectScores/<uid>`) after one more check. `prev` may be missing or
+// malformed. `checks` keeps counting after `history` is trimmed to the latest results; `solvedInChecks` is set once.
+export function nextSuspectScore(prev, result, now = Date.now()) {
+  const old = prev && typeof prev === "object" ? prev : {};
+  const oldHistory = Array.isArray(old.history) ? old.history.filter(isCheckResult) : [];
+  const checks = (Number.isInteger(old.checks) && old.checks >= oldHistory.length ? old.checks : oldHistory.length) + 1;
+  const history = [...oldHistory, { correct: result.correct, total: result.total }].slice(-MAX_SCORE_HISTORY);
+  const oldBest = isCheckResult({ correct: old.bestCorrect, total: old.bestTotal }) ? { correct: old.bestCorrect, total: old.bestTotal } : null;
+  const ratio = r => r.total > 0 ? r.correct / r.total : 0;
+  const beatsOld = !oldBest || ratio(result) > ratio(oldBest) || (ratio(result) === ratio(oldBest) && result.correct > oldBest.correct);
+  const best = beatsOld ? result : oldBest;
+  const solved = result.total > 0 && result.correct === result.total;
+  return {
+    checks, history,
+    bestCorrect: best.correct, bestTotal: best.total,
+    lastCorrect: result.correct, lastTotal: result.total,
+    solvedInChecks: Number.isInteger(old.solvedInChecks) ? old.solvedInChecks : (solved ? checks : null),
+    updatedAt: now,
+  };
+}
+
+// Leaderboard order: best single check (as a share of the crew) first, then fewer checks used, then who got there first.
+// Players with equal results share a rank. Only people still in the crew and with at least one check appear.
+export function rankSuspectScores(scores, users) {
+  const rows = Object.entries(scores || {})
+    .filter(([id, s]) => users?.[id] && s && Number.isInteger(s.checks) && s.checks > 0 && isCheckResult({ correct: s.bestCorrect, total: s.bestTotal }))
+    .map(([id, s]) => ({
+      id, name: users[id].name || "Crew member", picture: users[id].picture,
+      checks: s.checks, bestCorrect: s.bestCorrect, bestTotal: s.bestTotal,
+      solved: Number.isInteger(s.solvedInChecks), updatedAt: Number(s.updatedAt) || 0,
+    }));
+  const cmp = (a, b) => bestRatio(b) - bestRatio(a) || b.bestCorrect - a.bestCorrect || a.checks - b.checks;
+  rows.sort((a, b) => cmp(a, b) || a.updatedAt - b.updatedAt || a.name.localeCompare(b.name));
+  return rows.map(r => ({ ...r, rank: 1 + rows.filter(o => cmp(o, r) < 0).length }));
+}
+
+// Writes one more check to the shared leaderboard. Lives in its own collection, not on the user doc, because the profile
+// form re-saves a copy of the user doc loaded at sign-in and would overwrite newer scores with stale ones.
+export async function recordSuspectCheck(uid, prev, result) {
+  if (!uid || !isCheckResult(result)) return null;
+  const next = nextSuspectScore(prev, result);
+  await fsSet("suspectScores", uid, next);
+  return next;
+}
+
+export function SuspectLeaderboard({scores,users,uid}){
+  const rows=rankSuspectScores(scores,users);
+  const medal=r=>r===1?"🥇":r===2?"🥈":r===3?"🥉":`#${r}`;
+  return <div style={{marginTop:18}}>
+    <div style={{fontSize:11,fontWeight:700,color:T.amber,textTransform:"uppercase",letterSpacing:".08em",fontFamily:"'Cinzel',serif",marginBottom:8}}>
+      🏆 Leaderboard
+    </div>
+    {rows.length===0
+      ?<p style={{fontSize:12,color:T.hint,fontStyle:"italic",margin:0}}>No checks yet — be the first to crack the crew.</p>
+      :<div style={{display:"flex",flexDirection:"column",gap:6}}>
+        {rows.map(r=>{
+          const me=r.id===uid;
+          return <div key={r.id} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",borderRadius:6,
+            background:me?T.amberSoft:T.bgMid,border:`1.5px solid ${me?T.amber:T.border}`}}>
+            <span style={{width:34,textAlign:"center",fontSize:r.rank<=3?18:12,color:T.muted,fontFamily:"'Cinzel',serif",fontWeight:700}}>{medal(r.rank)}</span>
+            <Avatar name={r.name} picture={r.picture} size={26}/>
+            <span style={{flex:1,minWidth:0,fontSize:13,fontWeight:me?700:500,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+              {r.name}{me&&<span style={{fontSize:10,color:T.amber,marginLeft:6}}>(you)</span>}
+            </span>
+            <span style={{fontFamily:"'Cinzel',serif",fontSize:13,fontWeight:700,color:r.solved?"#4ADE80":T.amber}}>
+              {r.solved?"🎉 ":""}{r.bestCorrect}/{r.bestTotal}
+            </span>
+            <span style={{fontSize:11,color:T.hint,minWidth:62,textAlign:"right"}}>{r.checks} {r.checks===1?"check":"checks"}</span>
+          </div>;
+        })}
+      </div>}
+  </div>;
+}
+
+export function RoleGuessBoard({uid,users,allScores,onRecordCheck}){
   const [guesses,setGuesses]=useState(()=>loadGuesses(uid));
-  const [checks,setChecks]=useState(()=>loadChecks(uid));
+  const myScore=allScores?.[uid];
   const crew=Object.entries(users||{}).filter(([id])=>id!==uid).map(([id,u])=>({...u,id}))
     .sort((a,b)=>(a.name||"").localeCompare(b.name||""));
   const factions=Object.entries(NARRATIVE_FACTIONS);
@@ -4364,7 +4439,9 @@ export function RoleGuessBoard({uid,users}){
   const guessFor=id=>NARRATIVE_ROLES[guesses[id]]||guesses[id]===NOT_PLAYING?guesses[id]:"";
   const marked=crew.filter(c=>guessFor(c.id)).length;
   const allMarked=crew.length>0&&marked===crew.length;
-  const last=checks[checks.length-1];
+  const history=Array.isArray(myScore?.history)?myScore.history.filter(isCheckResult):[];
+  const checksMade=Number.isInteger(myScore?.checks)&&myScore.checks>=history.length?myScore.checks:history.length;
+  const last=history.at(-1);
   const perfect=!!last&&last.total>0&&last.correct===last.total;
   const setGuess=(id,roleKey)=>{
     const next={...guesses};
@@ -4375,9 +4452,7 @@ export function RoleGuessBoard({uid,users}){
   const runCheck=()=>{
     if(!allMarked) return;
     const valid=Object.fromEntries(crew.map(c=>[c.id,guessFor(c.id)]));
-    const next=[...checks,scoreGuesses(valid,users,uid)];
-    saveChecks(uid,next);
-    setChecks(next);
+    onRecordCheck?.(scoreGuesses(valid,users,uid));
   };
 
   return <Card style={{marginTop:14,border:`1.5px solid ${T.border2}`}}>
@@ -4432,16 +4507,18 @@ export function RoleGuessBoard({uid,users}){
         {perfect?`🎉 All ${last.total} correct!`:`${last.correct} of ${last.total} correct`}
       </div>}
       <div style={{fontSize:11,color:T.hint,marginTop:8,textAlign:"center"}}>
-        Checks made: {checks.length}
-        {checks.length>1&&` · history: ${checks.map(r=>`${r.correct}/${r.total}`).join(", ")}`}
+        Checks made: {checksMade}
+        {history.length>1&&` · history: ${history.length>10?"…, ":""}${history.slice(-10).map(r=>`${r.correct}/${r.total}`).join(", ")}`}
       </div>
     </div>}
+
+    <SuspectLeaderboard scores={allScores} users={users} uid={uid}/>
   </Card>;
 }
 
 // ── Narrative Dossier (player view) ──────────────────────────────────────────
 export function NarrativeDossier({ctx}){
-  const {profile,authUser,users}=ctx;
+  const {profile,authUser,users,suspectScores,doRecordSuspectCheck}=ctx;
   // Read the live user doc: `profile` is loaded once at sign-in, so it would miss a role assigned afterwards
   const me=(authUser&&users?.[authUser.uid])||profile;
   const roleKey=me?.narrativeRole;
@@ -4538,7 +4615,7 @@ export function NarrativeDossier({ctx}){
         </Card>
 
         {/* Private guesses about the rest of the crew */}
-        {authUser&&<RoleGuessBoard uid={authUser.uid} users={users}/>}
+        {authUser&&<RoleGuessBoard uid={authUser.uid} users={users} allScores={suspectScores} onRecordCheck={doRecordSuspectCheck}/>}
 
         {/* Reseal button */}
         <div style={{textAlign:"center",marginTop:18}}>
