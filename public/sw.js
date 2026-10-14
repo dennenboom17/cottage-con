@@ -1,16 +1,22 @@
 // Cottage Con Service Worker
-const CACHE_NAME = "cottage-con-v2";
+//
+// Browsers only re-install this worker when this file's bytes change, and activating the new one deletes every older
+// cache. So bump CACHE_NAME in any deploy that must reach installed users straight away (new icons, manifest, ...).
+const CACHE_NAME = "cottage-con-v3";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
-  "/manifest.json",
-  "/icons/icon-192.png",
-  "/icons/icon-512.png",
+  "/manifest.webmanifest",
+  "/icon-192.png",
+  "/icon-512.png",
 ];
 
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS))
+    // cache: "reload" skips the browser's HTTP cache, so a fresh deploy is never precached from a stale copy
+    caches.open(CACHE_NAME).then(cache =>
+      cache.addAll(STATIC_ASSETS.map(url => new Request(url, { cache: "reload" })))
+    )
   );
   self.skipWaiting();
 });
@@ -23,6 +29,48 @@ self.addEventListener("activate", event => {
   );
   self.clients.claim();
 });
+
+// Only cache valid same-origin responses
+function cacheIfValid(request, response) {
+  if (
+    !response ||
+    response.status !== 200 ||
+    response.type === "opaque" ||
+    response.type === "error"
+  ) {
+    return;
+  }
+  // Clone BEFORE the body is read — the clone goes to cache, the original to the browser
+  const toCache = response.clone();
+  caches.open(CACHE_NAME).then(cache => cache.put(request, toCache));
+}
+
+function cacheFirst(request) {
+  return caches.match(request).then(cached => {
+    if (cached) return cached;
+    return fetch(request).then(response => {
+      cacheIfValid(request, response);
+      return response;
+    });
+  });
+}
+
+// Used for anything that can change at the same URL (the page, manifests, icons): always ask the network first so an
+// installed app picks up a deploy, and fall back to the cache only when offline.
+function networkFirst(request) {
+  return fetch(request)
+    .then(response => {
+      cacheIfValid(request, response);
+      return response;
+    })
+    .catch(() =>
+      caches.match(request).then(cached => {
+        if (cached) return cached;
+        // Offline fallback for navigation requests
+        if (request.mode === "navigate") return caches.match("/index.html");
+      })
+    );
+}
 
 self.addEventListener("fetch", event => {
   const { request } = event;
@@ -44,31 +92,7 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  event.respondWith(
-    caches.match(request).then(cached => {
-      if (cached) return cached;
-
-      return fetch(request).then(response => {
-        // Only cache valid same-origin responses
-        if (
-          !response ||
-          response.status !== 200 ||
-          response.type === "opaque" ||
-          response.type === "error"
-        ) {
-          return response;
-        }
-
-        // Clone BEFORE reading — the clone goes to cache, original to browser
-        const toCache = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(request, toCache));
-        return response;
-      }).catch(() => {
-        // Offline fallback for navigation requests
-        if (request.mode === "navigate") {
-          return caches.match("/index.html");
-        }
-      });
-    })
-  );
+  // Vite's /assets/* files are content-hashed, so a cached copy can never be stale
+  const hashed = url.pathname.startsWith("/assets/");
+  event.respondWith(hashed ? cacheFirst(request) : networkFirst(request));
 });

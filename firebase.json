@@ -22,13 +22,21 @@
       {
         "source": "/manifest.json",
         "headers": [
+          { "key": "Cache-Control", "value": "no-cache" },
+          { "key": "Content-Type", "value": "application/manifest+json" }
+        ]
+      },
+      {
+        "source": "/manifest.webmanifest",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache" },
           { "key": "Content-Type", "value": "application/manifest+json" }
         ]
       },
       {
         "source": "/icons/**",
         "headers": [
-          { "key": "Cache-Control", "value": "public, max-age=604800" }
+          { "key": "Cache-Control", "value": "no-cache" }
         ]
       }
     ],

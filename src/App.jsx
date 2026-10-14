@@ -1211,7 +1211,7 @@ function usePushNotifications(authUser, profile, doUpdateProfile, showToast){
         const {title, body} = payload.notification || {};
         // Show native notification if permission granted (some browsers suppress in foreground)
         if(Notification.permission==="granted" && title){
-          try { new Notification(title, {body, icon:"/icons/icon-192.png", badge:"/icons/icon-72.png"}); }
+          try { new Notification(title, {body, icon:"/icon-192.png", badge:"/icon-72.png"}); }
           catch(e){ console.warn("Native notification failed:", e); }
         }
         // Show rich in-app notification banner for foreground messages

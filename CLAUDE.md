@@ -13,11 +13,10 @@ npm install        # install deps
 npm run dev         # start Vite dev server at http://localhost:5173
 npm run build        # production build to dist/
 npm run preview       # preview the production build locally
-npm run deploy        # build + firebase deploy --only hosting (deploys to https://cottagecon-b8d82.web.app)
-npx eslint .          # lint (no npm script defined for this; eslint.config.js is present)
+npm run build && firebase deploy --only hosting   # deploy to https://cottagecon-b8d82.web.app (there is no "deploy" npm script; build on a machine where .env.local is readable, or the Gemini key is baked in empty)
+npm run lint          # oxlint
+npm test              # Vitest (npm run test:watch to watch; npx vitest run src/test/<file> for one file)
 ```
-
-There is no test suite/framework configured in this repo.
 
 `firebase login` is required once before the first deploy.
 
@@ -50,6 +49,11 @@ There is no test suite/framework configured in this repo.
 - `usePushNotifications` hook (App.jsx) requests FCM permission/token and stores it on the user's profile.
 - `public/sw.js` and `public/firebase-messaging-sw.js` are the service workers; `vite.config.js` has a custom `copySwFiles` plugin to ensure both are copied into `dist/` on build (Vite doesn't do this automatically for `public/` files referenced only by the SW registration, and `firebase.json` sets no-cache headers on them specifically).
 - Sending a notification writes a doc to the `notifications` Firestore collection for fan-out; there's no Cloud Functions source in this repo, so server-side delivery logic (if any) lives outside this codebase.
+
+### PWA updates (service worker, manifest, icons)
+- `public/sw.js` is network-first for everything except content-hashed `/assets/*` (cache-first), so an installed app picks up a deploy. The browser only re-installs a worker when `sw.js`'s bytes change, and activating the new one deletes every older cache — so **bump `CACHE_NAME` in any deploy that must reach installed users straight away** (new icons, manifest changes). An unchanged worker keeps serving whatever page it cached.
+- Icons live at the root (`public/icon-*.png`, `apple-touch-icon.png`) and are referenced by `manifest.webmanifest` (linked from `index.html`). `public/manifest.json` and `public/icons/*` are legacy URLs that older installs, caches and notifications still know: keep `manifest.json` on the same icons/colours as the live manifest and keep `icons/*` showing the current art. `firebase.json` serves both manifests and `/icons/**` with `no-cache`. `src/test/pwa.test.js` checks all of this and runs the worker in a sandbox.
+- Existing installs: Android and desktop Chrome refresh the icon themselves (typically within a day or two). iOS copies the home-screen icon when the user adds the app and can't be updated remotely — those users must remove and re-add it.
 
 ### Styling
 - No CSS framework/component library. All styling is inline `style={}` objects using a shared theme object `T` (colors) defined near the top of App.jsx, plus a `CREW_RANKS`/`GAME_CAT_COLORS` lookup for badge colors. `index.css` only holds global resets, `@font-face`/animation keyframes, and a few utility classes (`.cc-desktop-tabs`, `.cc-hamburger`, `.cc-fade`) used for responsive show/hide and page-transition effects.

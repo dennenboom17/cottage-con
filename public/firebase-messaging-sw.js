@@ -44,13 +44,13 @@ messaging.onBackgroundMessage(payload => {
   const d     = payload.data         || {};
   const title = n.title || d.title   || "Cottage Con";
   const body  = n.body  || d.body    || "You have a new update.";
-  const icon  = n.icon  || d.icon    || "/icons/icon-192.png";
+  const icon  = n.icon  || d.icon    || "/icon-192.png";
   const url   = d.url   || "/";
 
   return self.registration.showNotification(title, {
     body,
     icon,
-    badge:              "/icons/icon-72.png",
+    badge:              "/icon-72.png",
     vibrate:            [200, 100, 200],
     tag:                "cottage-con",        // replaces previous notification
     renotify:           true,                  // vibrate even if tag matches
