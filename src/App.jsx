@@ -1534,6 +1534,23 @@ export const cleanGameName = (raw = "") => raw
   .trim();
 
 
+// Fields an admin can change while someone is signed in (tour reset, role, deposit, rank). `profile` is loaded once at
+// sign-in, so without this a later profile save would write the old values back over the admin's change.
+const LIVE_PROFILE_FIELDS = ["onboarded", "narrativeRole", "deposit", "crewRank"];
+export function syncLiveProfileFields(profile, live) {
+  if (!profile || !live) return profile;
+  const changed = LIVE_PROFILE_FIELDS.filter(k => k in live && !Object.is(live[k], profile[k]));
+  return changed.length ? { ...profile, ...Object.fromEntries(changed.map(k => [k, live[k]])) } : profile;
+}
+
+// Replays the welcome tour for the given users (on their next sign-in or reload). Reports failures instead of throwing,
+// so one rejected write doesn't hide that the others went through.
+export async function resetOnboardingForAll(userIds) {
+  const results = await Promise.allSettled(userIds.map(id => fsSet("users", id, { onboarded: false })));
+  const failed = userIds.filter((_, i) => results[i].status === "rejected");
+  return { total: userIds.length, done: userIds.length - failed.length, failed };
+}
+
 export default function App(){
   const [authUser, setAuthUser] = useState(undefined);
   const [profile,  setProfile]  = useState(null);
@@ -1607,6 +1624,10 @@ export default function App(){
     ];
     return()=>subs.forEach(u=>u());
   },[authUser]);
+
+  useEffect(()=>{
+    setProfile(p=>syncLiveProfileFields(p, users[authUser?.uid]));
+  },[users, authUser?.uid]);
 
   const doRegister=async(email,pw,name,dietary,picture)=>{
     const cred=await createUserWithEmailAndPassword(auth,email,pw);
@@ -1735,6 +1756,15 @@ export default function App(){
     catch(e){ console.error("[suspectScores] save failed:", e); showToast("⚠️ Couldn't save your score. Check your connection and try again."); }
   };
 
+  // Engine Room: replay the welcome tour for everyone
+  const doResetOnboarding = async () => {
+    const result = await resetOnboardingForAll(Object.keys(users));
+    showToast(result.failed.length
+      ? `⚠️ Reset ${result.done} of ${result.total} crew. Try again for the rest.`
+      : `Welcome tour reset for ${result.done} crew.`);
+    return result;
+  };
+
   // Narrative role assignment — engine room only (quiet skips the toast, for bulk assignment)
   const doAssignNarrativeRole = async (userId, roleKey, quiet=false) => {
     if(!users[userId]) return;
@@ -1758,7 +1788,7 @@ export default function App(){
     doSaveFood,doDelFood,doSaveSupply,doDelSupply,
     doSaveMenuItem,doDelMenuItem,doClaimSlot,doUnclaimSlot,doInitDeckHands,
     doSaveReceipt,doDelReceipt,
-    doSaveItinDay,doDelItinDay,doSaveDeckSlot,doDelDeckSlot,doSetDeposit,doSetRank,doSendNotification,doSaveCostSettings,costSettings,doSaveItinMeta,itinMeta,doAssignNarrativeRole,suspectScores,doRecordSuspectCheck,
+    doSaveItinDay,doDelItinDay,doSaveDeckSlot,doDelDeckSlot,doSetDeposit,doSetRank,doSendNotification,doSaveCostSettings,costSettings,doSaveItinMeta,itinMeta,doAssignNarrativeRole,suspectScores,doRecordSuspectCheck,doResetOnboarding,
     notifPerm,notifSupported,requestPermission};
 
   return <>
@@ -4246,7 +4276,7 @@ export function BggIndexManager({ctx}){
   );
 }
 
-function EngineRoom({ctx}){
+export function EngineRoom({ctx}){
   const [tab,setTab]=useState("itinerary");
   const [unlocked,setUnlocked]=useState(false);
   const [pwInput,setPwInput]=useState("");
@@ -4271,7 +4301,7 @@ function EngineRoom({ctx}){
     <div className="cc-fade">
       <SectionTitle sub="Manage itinerary days and deck hand duties">Engine Room</SectionTitle>
       <div style={{display:"flex",gap:8,marginBottom:22,flexWrap:"wrap"}}>
-        {[["itinerary","🗓 Itinerary Days"],["deckslots","⚙️ Deck Hand Slots"],["deposits","💰 Deposits"],["ranks","⚓ Crew Ranks"],["notify","📨 Notify"],["costs","🧮 Cost Calculator"],["bgg","📚 BGG Index"],["narrative","🎭 Narrative Roles"]].map(([id,label])=>(
+        {[["itinerary","🗓 Itinerary Days"],["deckslots","⚙️ Deck Hand Slots"],["deposits","💰 Deposits"],["ranks","⚓ Crew Ranks"],["notify","📨 Notify"],["costs","🧮 Cost Calculator"],["bgg","📚 BGG Index"],["narrative","🎭 Narrative Roles"],["tour","👋 Welcome Tour"]].map(([id,label])=>(
           <button key={id} onClick={()=>setTab(id)} style={{fontFamily:"'Cinzel',serif",fontSize:12,fontWeight:700,padding:"7px 16px",borderRadius:5,cursor:"pointer",border:`2px solid ${tab===id?T.amber:T.border}`,background:tab===id?T.amberSoft:"transparent",color:tab===id?T.amber:T.muted,transition:"all .15s"}}>{label}</button>
         ))}
       </div>
@@ -4283,8 +4313,66 @@ function EngineRoom({ctx}){
       {tab==="costs"&&<CostCalculator ctx={ctx}/>}
       {tab==="bgg"&&<BggIndexManager ctx={ctx}/>}
       {tab==="narrative"&&<NarrativeManager ctx={ctx}/>}
+      {tab==="tour"&&<WelcomeTourManager ctx={ctx}/>}
     </div>
   );
+}
+
+// ── Welcome Tour reset (Engine Room) ─────────────────────────────────────────
+export function WelcomeTourManager({ctx}){
+  const {users,doResetOnboarding}=ctx;
+  const crew=Object.values(users||{});
+  const waiting=crew.filter(u=>u.onboarded===false).length;
+  const [confirming,setConfirming]=useState(false);
+  const [busy,setBusy]=useState(false);
+  const [result,setResult]=useState(null);
+
+  const reset=async()=>{
+    setBusy(true);
+    try{ setResult(await doResetOnboarding()); }
+    catch{ setResult({total:crew.length,done:0,failed:crew.map(u=>u.id)}); }
+    setBusy(false);
+    setConfirming(false);
+  };
+
+  return <div>
+    <h3 style={{fontFamily:"'Cinzel',serif",fontSize:14,color:T.amber,margin:"0 0 10px"}}>👋 Welcome Tour</h3>
+    <p style={{fontSize:12,color:T.muted,marginBottom:16,lineHeight:1.6}}>
+      Replays the welcome tour for the whole crew. Each person sees it again the next time they open or reload the app, and it
+      stops once they finish or skip it.
+    </p>
+
+    <Card style={{background:T.bgMid}}>
+      <div style={{fontSize:13,color:T.text,marginBottom:14}}>
+        {crew.length===0
+          ?"No crew have joined yet."
+          :waiting===0
+            ?`No one is waiting to see the tour (${crew.length} crew).`
+            :`${waiting} of ${crew.length} crew have the tour waiting.`}
+      </div>
+
+      {!confirming
+        ?<Btn variant="danger" disabled={crew.length===0||busy} onClick={()=>setConfirming(true)}>
+          <i className="ti ti-refresh"/> Reset for everyone
+        </Btn>
+        :<div role="alertdialog" aria-label="Confirm reset" style={{border:`1.5px solid ${T.danger}55`,background:T.dangerBg,borderRadius:6,padding:"12px 14px"}}>
+          <div style={{fontSize:12,color:T.text,marginBottom:10,lineHeight:1.5}}>
+            Replay the tour for all {crew.length} crew members?
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <Btn variant="danger" disabled={busy} onClick={reset}>{busy?"Resetting…":"Yes, reset everyone"}</Btn>
+            <Btn variant="ghost" disabled={busy} onClick={()=>setConfirming(false)}>Cancel</Btn>
+          </div>
+        </div>}
+
+      {result&&<div role="status" style={{marginTop:14,fontSize:12,lineHeight:1.5,
+        color:result.failed.length?T.danger:"#4ADE80"}}>
+        {result.failed.length
+          ?`⚠️ Reset ${result.done} of ${result.total} crew. Press the button again to retry the rest.`
+          :`✓ Reset for ${result.done} crew. They will see the tour the next time they open or reload the app.`}
+      </div>}
+    </Card>
+  </div>;
 }
 
 // ── Narrative Manager (Engine Room) ──────────────────────────────────────────
