@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { getDoc, setDoc } from 'firebase/firestore'
-import { NarrativeDossier, NarrativeManager, CaptainsLog, NARRATIVE_ROLES, NARRATIVE_FACTIONS, pickRandomRoles, scoreGuesses, nextSuspectScore, rankSuspectScores, recordSuspectCheck, SuspectLeaderboard, pickChatTip, HUSS_TIP, CrewAssistant, resetBggMatcher } from '../App.jsx'
+import { NarrativeDossier, NarrativeManager, CaptainsLog, NARRATIVE_ROLES, NARRATIVE_FACTIONS, pickRandomRoles, requiredRoles, scoreGuesses, nextSuspectScore, rankSuspectScores, recordSuspectCheck, SuspectLeaderboard, pickChatTip, HUSS_TIP, CrewAssistant, resetBggMatcher } from '../App.jsx'
 
 describe('narrative data', () => {
   it('gives every role a valid faction and a complete briefing', () => {
@@ -30,7 +30,7 @@ describe('narrative data', () => {
       expect(r, key).toBeTruthy()
       expect(r.faction, `${key} faction`).toBe(faction)
       expect(r.objectives[0], `${key} first objective`).toContain(target)
-      expect(r.requires, `${key} requires`).toBe(targetKey)
+      expect([].concat(r.requires), `${key} requires`).toContain(targetKey)
     }
     expect(NARRATIVE_ROLES.arms_dealer.title).toBe('Freelance Arms Dealer')
     expect(NARRATIVE_ROLES.smuggler.title).toBe('Black Market Smuggler')
@@ -42,11 +42,12 @@ describe('narrative data', () => {
     expect(new Set(roles.map(r => r.title)).size).toBe(roles.length)
   })
 
-  it('only requires roles that exist and have no requirement of their own', () => {
+  it('only requires roles that exist, and never itself', () => {
     for (const [key, r] of Object.entries(NARRATIVE_ROLES)) {
-      if (!r.requires) continue
-      expect(NARRATIVE_ROLES[r.requires], `${key} requires ${r.requires}`).toBeTruthy()
-      expect(NARRATIVE_ROLES[r.requires].requires, `${r.requires} must not chain`).toBeUndefined()
+      for (const need of [].concat(r.requires || [])) {
+        expect(NARRATIVE_ROLES[need], `${key} requires ${need}`).toBeTruthy()
+        expect(need, `${key} must not require itself`).not.toBe(key)
+      }
     }
   })
 
@@ -64,10 +65,34 @@ describe('narrative data', () => {
   })
 })
 
+describe('requiredRoles', () => {
+  it('lists a role\'s direct requirements', () => {
+    expect(requiredRoles('rebel_recruit')).toEqual(['rebel_commander'])
+    expect(requiredRoles('imperial_smuggler_hunter')).toEqual(['smuggler', 'rebel_black_market_agent'])
+  })
+
+  it('follows requirements transitively, so the hunter brings the dealer and the buyer', () => {
+    expect([...requiredRoles('imperial_arms_hunter')].sort()).toEqual(['arms_dealer', 'rebel_arms_buyer'])
+  })
+
+  it('copes with a pair that require each other, and never lists the role itself', () => {
+    expect(requiredRoles('smuggler')).toEqual(['rebel_black_market_agent'])
+    expect(requiredRoles('rebel_black_market_agent')).toEqual(['smuggler'])
+    for (const key of Object.keys(NARRATIVE_ROLES)) expect(requiredRoles(key)).not.toContain(key)
+  })
+
+  it('returns nothing for a role with no requirements, an unknown role, or a made-up cycle', () => {
+    expect(requiredRoles('rebel_commander')).toEqual([])
+    expect(requiredRoles('nope')).toEqual([])
+    const roles = { a: { requires: 'b' }, b: { requires: ['c', 'ghost'] }, c: { requires: 'a' } }
+    expect([...requiredRoles('a', roles)].sort()).toEqual(['b', 'c'])
+  })
+})
+
 describe('pickRandomRoles', () => {
   const total = Object.keys(NARRATIVE_ROLES).length
   const seeded = (seed) => () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296 }
-  const targetsPresent = (picks) => picks.every(k => !NARRATIVE_ROLES[k].requires || picks.includes(NARRATIVE_ROLES[k].requires))
+  const targetsPresent = (picks) => picks.every(k => requiredRoles(k).every(t => picks.includes(t)))
 
   it('never picks a buyer or hunter without the role it targets, for any group size', () => {
     for (let count = 0; count <= total + 6; count++) {
@@ -83,6 +108,27 @@ describe('pickRandomRoles', () => {
     for (let count = 1; count <= total; count++) {
       const picks = pickRandomRoles(count, NARRATIVE_ROLES, seeded(count * 7))
       expect(new Set(picks).size, `count ${count}`).toBe(count)
+    }
+  })
+
+  it('hands out exactly the number asked for, with every requirement met, at every size', () => {
+    for (let count = 0; count <= total + 3; count++) {
+      for (let seed = 1; seed <= 300; seed++) {
+        const picks = pickRandomRoles(count, NARRATIVE_ROLES, seeded(seed * 31 + count))
+        expect(picks.length, `count ${count} seed ${seed}`).toBe(count)
+        expect(targetsPresent(picks), `count ${count} seed ${seed}: ${picks}`).toBe(true)
+      }
+    }
+  })
+
+  it('works for a made-up role set with a chain and a cycle', () => {
+    const roles = { a: {}, b: { requires: 'a' }, c: { requires: ['b'] }, d: { requires: 'e' }, e: { requires: 'd' }, f: {} }
+    for (let count = 1; count <= 6; count++) {
+      for (let seed = 1; seed <= 100; seed++) {
+        const picks = pickRandomRoles(count, roles, seeded(seed))
+        expect(picks).toHaveLength(count)
+        for (const k of picks) for (const t of requiredRoles(k, roles)) expect(picks, `${k} needs ${t}`).toContain(t)
+      }
     }
   })
 
@@ -190,6 +236,30 @@ describe('NarrativeManager', () => {
     expect(screen.queryByText(/is assigned, so this role has nobody to target/)).not.toBeInTheDocument()
   })
 
+  it('warns when a win condition cannot be completed with the crew as assigned', () => {
+    setup({ users: { u1: { name: 'Ana', narrativeRole: 'imperial_security' }, u2: { name: 'Ben', narrativeRole: 'rebel_spy' } } })
+    expect(screen.getByText(/Win condition can't be completed: it needs 2 Rebellion members but only 1 is assigned/)).toBeInTheDocument()
+  })
+
+  it('does not warn when the win condition can be completed', () => {
+    setup({ users: {
+      u1: { name: 'Ana', narrativeRole: 'imperial_security' }, u2: { name: 'Ben', narrativeRole: 'rebel_spy' }, u3: { name: 'Cleo', narrativeRole: 'rebel_pilot' },
+      u4: { name: 'Dan', narrativeRole: 'imperial_agent' }, // enough on each side for everyone's win to be possible
+    } })
+    expect(screen.queryByText(/Win condition can't be completed/)).not.toBeInTheDocument()
+  })
+
+  it('lists every missing required role, with the right grammar', () => {
+    setup({ users: { u1: { name: 'Ana', narrativeRole: 'imperial_arms_hunter' } } })
+    expect(screen.getByText(/No Freelance Arms Dealer and Rebel Arms Procurement Officer are assigned, so this role has nobody to target/)).toBeInTheDocument()
+  })
+
+  it('shows one warning per player: the missing target takes priority over the win-condition warning', () => {
+    setup({ users: { u1: { name: 'Ana', narrativeRole: 'rebel_arms_buyer' } } })
+    expect(screen.getByText(/No Freelance Arms Dealer is assigned/)).toBeInTheDocument()
+    expect(screen.queryByText(/Win condition can't be completed/)).not.toBeInTheDocument()
+  })
+
   it('groups the role options under their faction', () => {
     setup()
     const [select] = screen.getAllByRole('combobox')
@@ -211,8 +281,7 @@ describe('NarrativeManager', () => {
     const keys = ctx.doAssignNarrativeRole.mock.calls.map(c => c[1])
     expect(new Set(keys).size).toBe(2) // fewer crew than roles, so no one shares a role
     for (const k of keys) {
-      const need = NARRATIVE_ROLES[k].requires
-      if (need) expect(keys, `${k} needs ${need}`).toContain(need)
+      for (const need of requiredRoles(k)) expect(keys, `${k} needs ${need}`).toContain(need)
     }
     expect(ctx.showToast).toHaveBeenCalledTimes(1)
   })
@@ -280,8 +349,8 @@ describe('Crew suspect board (inside the dossier)', () => {
   it('lists every other crew member but not the player, starting with nothing marked', async () => {
     await renderOpen()
     expect(screen.getByText(/Crew Suspect Board/)).toBeInTheDocument()
-    expect(screen.getByText('Ben')).toBeInTheDocument()
-    expect(screen.getByText('Cleo')).toBeInTheDocument()
+    expect(screen.getByLabelText('Guess role for Ben')).toBeInTheDocument()
+    expect(screen.getByLabelText('Guess role for Cleo')).toBeInTheDocument()
     expect(screen.queryByLabelText('Guess role for Ana')).not.toBeInTheDocument()
     expect(screen.getByText('0 of 2 marked')).toBeInTheDocument()
   })

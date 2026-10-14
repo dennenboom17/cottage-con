@@ -70,6 +70,8 @@ describe('welcome tour', () => {
     const byTitle = Object.fromEntries((await walk()).map(c => [c.title, c.text]))
     expect(byTitle['Personal Log']).toMatch(/classified dossier is kept/)
     expect(byTitle['Your Dossier']).toMatch(/top of your Personal Log/)
+    expect(byTitle['Your Dossier']).toMatch(/win condition/)
+    expect(byTitle['Your Dossier']).toMatch(/photo as proof/)
     expect(byTitle['Crew Suspect Board']).toMatch(/Check my guesses/)
     expect(byTitle['Crew Suspect Board']).toMatch(/leaderboard/)
     expect(byTitle['Crew Suspect Board']).toMatch(/private on your device/)

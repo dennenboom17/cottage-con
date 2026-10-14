@@ -142,6 +142,15 @@ export const NARRATIVE_ROLES = {
       "Report suspicious behaviour without revealing your true rank",
       "Protect the Emperor's interests above all else",
     ],
+    win:{
+      type:"identify",
+      text:"Identify two members of the Rebellion.",
+      proofHint:"A photo of the people you are naming, or the evidence that gave them away.",
+      slots:[
+        {faction:"rebellion",label:"Rebellion member 1"},
+        {faction:"rebellion",label:"Rebellion member 2"},
+      ],
+    },
     tips:[
       "Spies hide in plain sight, so watch who volunteers for the quiet jobs.",
       "Your own side can lie to you too. Verify before you report anyone.",
@@ -163,6 +172,14 @@ export const NARRATIVE_ROLES = {
       "Make contact with other Imperial agents without blowing your cover",
       "Do not reveal your identity to anyone who hasn't earned your trust",
     ],
+    win:{
+      type:"identify",
+      text:"Expose a member of the Rebellion, with proof.",
+      proofHint:"A photo of the people you are naming, or the evidence that gave them away.",
+      slots:[
+        {faction:"rebellion",label:"Rebellion member"},
+      ],
+    },
     tips:[
       "Arrests need proof. Remember who said what before you act.",
       "A warm welcome is the best bait. Let suspects come to you.",
@@ -184,6 +201,15 @@ export const NARRATIVE_ROLES = {
       "Delay or sabotage Rebellion plans without being detected",
       "When the time is right, signal the Empire with what you've learned",
     ],
+    win:{
+      type:"identify",
+      text:"Identify two members of the Rebellion without blowing your cover.",
+      proofHint:"A photo of the people you are naming, or the evidence that gave them away.",
+      slots:[
+        {faction:"rebellion",label:"Rebellion member 1"},
+        {faction:"rebellion",label:"Rebellion member 2"},
+      ],
+    },
     tips:[
       "The best cover is being useful. Volunteer for something the rebels need.",
       "Save your signal for the right moment. A rushed report burns the whole operation.",
@@ -205,13 +231,22 @@ export const NARRATIVE_ROLES = {
       "Catch the sale in progress — proof of the exchange is what makes an arrest stick",
       "Keep your investigation hidden, or the dealer will go quiet",
     ],
+    win:{
+      type:"identify",
+      text:"Identify both the Freelance Arms Dealer and the Rebel buyer.",
+      proofHint:"A photo of the people you are naming, or the evidence that gave them away.",
+      slots:[
+        {role:"arms_dealer",label:"The Freelance Arms Dealer"},
+        {role:"rebel_arms_buyer",label:"The Rebel buyer"},
+      ],
+    },
     tips:[
       "Dealers and buyers avoid being seen together. Watch who slips away in pairs.",
       "Catch the sale, not just the suspect. Hold your move until the goods change hands.",
       "Talk about games to look harmless. People say more when they feel safe.",
     ],
     suspectHint:"Dealers and buyers avoid being seen together. Watch for private conversations and sudden changes of subject.",
-    requires:"arms_dealer",
+    requires:["arms_dealer","rebel_arms_buyer"],
     knowsFaction: false,
   },
   imperial_smuggler_hunter: {
@@ -227,6 +262,14 @@ export const NARRATIVE_ROLES = {
       "Make the arrest before the cargo changes hands, if you can",
       "Do not reveal your badge until you are ready to act",
     ],
+    win:{
+      type:"identify",
+      text:"Identify the Black Market Smuggler and catch them with the contraband.",
+      proofHint:"A photo of the people you are naming, or the evidence that gave them away.",
+      slots:[
+        {role:"smuggler",label:"The Black Market Smuggler"},
+      ],
+    },
     tips:[
       "Smugglers court whoever pays. Watch who is suddenly everyone’s friend.",
       "Gather your proof first. An arrest without evidence gets thrown out.",
@@ -250,6 +293,15 @@ export const NARRATIVE_ROLES = {
       "Identify who among the crew can be recruited or who must be avoided",
       "Protect rebel identities from the Imperial agents you know are watching",
     ],
+    win:{
+      type:"meet",
+      text:"Make contact with two of your fellow rebels.",
+      proofHint:"A photo of you with the person you met.",
+      slots:[
+        {faction:"rebellion",label:"Rebel you met 1"},
+        {faction:"rebellion",label:"Rebel you met 2"},
+      ],
+    },
     tips:[
       "Scattered rebels cannot win. Find your people before the Empire finds you.",
       "Test a recruit with a harmless question first, then build up to the real one.",
@@ -271,12 +323,21 @@ export const NARRATIVE_ROLES = {
       "Once recruited, follow orders from your cell commander",
       "Keep your mouth shut and your politics off your sleeve",
     ],
+    win:{
+      type:"meet",
+      text:"Find and meet your Cell Commander.",
+      proofHint:"A photo of you with the person you met.",
+      slots:[
+        {role:"rebel_commander",label:"Your Cell Commander"},
+      ],
+    },
     tips:[
       "Do not approach anyone you cannot read. Let the commander find you.",
       "Keep your politics to yourself until you are sure who you are talking to.",
       "A good listener is worth more than a loud rebel.",
     ],
     suspectHint:"The Rebellion will find you a way to signal them — if you know where to look.",
+    requires:"rebel_commander",
     knowsFaction: false,
   },
   rebel_pilot: {
@@ -292,6 +353,14 @@ export const NARRATIVE_ROLES = {
       "Coordinate a safe extraction route without alerting security",
       "Leave no rebel behind — but don't risk the mission for someone you can't verify",
     ],
+    win:{
+      type:"meet",
+      text:"Meet a rebel who needs extraction.",
+      proofHint:"A photo of you with the person you met.",
+      slots:[
+        {faction:"rebellion",label:"Rebel you met"},
+      ],
+    },
     tips:[
       "You cannot fly anyone out if you are arrested. Keep a low profile.",
       "Know your route before you need it. Ask casual questions about who might need a lift.",
@@ -313,6 +382,15 @@ export const NARRATIVE_ROLES = {
       "Report Imperial agent identities back to your cell commander",
       "Never carry anything that could compromise the Rebellion if searched",
     ],
+    win:{
+      type:"identify",
+      text:"Identify two Imperial agents.",
+      proofHint:"A photo of the people you are naming, or the evidence that gave them away.",
+      slots:[
+        {faction:"empire",label:"Imperial agent 1"},
+        {faction:"empire",label:"Imperial agent 2"},
+      ],
+    },
     tips:[
       "Imperial agents tend to ask too many questions. Watch for patterns.",
       "Plant a rumour with one person and see where it comes back from.",
@@ -334,6 +412,14 @@ export const NARRATIVE_ROLES = {
       "Keep the deal secret from Imperial agents — a traced sale means a ruined cell",
       "Report the completed purchase to your cell commander",
     ],
+    win:{
+      type:"meet",
+      text:"Meet the Freelance Arms Dealer and close the deal.",
+      proofHint:"A photo of you with the person you met.",
+      slots:[
+        {role:"arms_dealer",label:"The Freelance Arms Dealer"},
+      ],
+    },
     tips:[
       "The dealer sells to anyone with credits, so do not be the loudest buyer.",
       "Name no cell and no commander. Keep the reason you are buying to yourself.",
@@ -356,6 +442,14 @@ export const NARRATIVE_ROLES = {
       "Keep Imperial inspectors from learning where the goods are going",
       "Deliver the goods to your cell commander",
     ],
+    win:{
+      type:"meet",
+      text:"Meet the Black Market Smuggler and buy the cargo.",
+      proofHint:"A photo of you with the person you met.",
+      slots:[
+        {role:"smuggler",label:"The Black Market Smuggler"},
+      ],
+    },
     tips:[
       "The smuggler takes better offers mid-voyage. Pay before a rival does.",
       "Keep the goods’ destination to yourself. Inspectors follow the cargo.",
@@ -379,12 +473,21 @@ export const NARRATIVE_ROLES = {
       "Do not get caught in the crossfire between factions — neutrality is your survival",
       "If someone offers a better deal mid-voyage, take it",
     ],
+    win:{
+      type:"meet",
+      text:"Meet the Rebel Black Market Agent and sell your cargo.",
+      proofHint:"A photo of you with the person you met.",
+      slots:[
+        {role:"rebel_black_market_agent",label:"The Rebel buyer"},
+      ],
+    },
     tips:[
       "Everyone has a price. Find out what each side wants most.",
       "Neutrality is your armour. Never reveal which side offered more.",
       "A better deal mid-voyage beats loyalty. Keep your options open.",
     ],
     suspectHint:"Everyone has a price. Find it.",
+    requires:"rebel_black_market_agent",
     knowsFaction: false,
   },
   arms_dealer: {
@@ -400,12 +503,21 @@ export const NARRATIVE_ROLES = {
       "Stay neutral — the moment you pick a side, the other side picks a price on your head",
       "Get paid and get out before the shooting starts",
     ],
+    win:{
+      type:"meet",
+      text:"Meet the Rebel Arms Procurement Officer and make the sale.",
+      proofHint:"A photo of you with the person you met.",
+      slots:[
+        {role:"rebel_arms_buyer",label:"The Rebel buyer"},
+      ],
+    },
     tips:[
       "Stay neutral. The moment you pick a side, the other puts a price on your head.",
       "Sell to both sides without either knowing about the other.",
       "Get paid first. Leave before the shooting starts.",
     ],
     suspectHint:"The most dangerous thing you can do is let either side know you're working both of them.",
+    requires:"rebel_arms_buyer",
     knowsFaction: false,
   },
   information_broker: {
@@ -421,6 +533,11 @@ export const NARRATIVE_ROLES = {
       "Never reveal you're an information broker or your value drops to zero",
       "Make sure you're on the winning side's good side before the end",
     ],
+    win:{
+      type:"board",
+      text:"Reach 60% correct on the Crew Suspect Board.",
+      minShare:0.6,
+    },
     tips:[
       "Everyone talks if you let them. Ask questions and listen more than you speak.",
       "Never give information away free. It is only valuable while it is rare.",
@@ -431,9 +548,23 @@ export const NARRATIVE_ROLES = {
   },
 };
 
-// Picks `count` role keys for random assignment. A role with `requires` (a buyer or hunter chasing an
-// independent) is only picked together with the role it targets, so nobody is handed a mission with no target.
-// Roles are unique while count <= number of roles; beyond that they repeat, which is safe because every role is then in play.
+// The roles that must be in play whenever `key` is: its `requires` and, transitively, theirs. A requirement can be one
+// key or a list, and cycles are fine (a smuggler and the buyer who needs them require each other).
+export function requiredRoles(key, roles = NARRATIVE_ROLES) {
+  const seen = new Set();
+  const stack = [key];
+  while (stack.length) {
+    for (const t of [].concat(roles[stack.pop()]?.requires || [])) {
+      if (roles[t] && !seen.has(t)) { seen.add(t); stack.push(t); }
+    }
+  }
+  seen.delete(key);
+  return [...seen];
+}
+
+// Picks `count` role keys for random assignment such that every picked role's requirements (transitively) are picked too,
+// so nobody is handed a mission with nobody to carry it out against. Roles are unique while count <= number of roles;
+// beyond that they repeat, which is safe because every role is then in play.
 export function pickRandomRoles(count, roles = NARRATIVE_ROLES, rand = Math.random) {
   const shuffle = (arr) => {
     const a = [...arr];
@@ -444,18 +575,26 @@ export function pickRandomRoles(count, roles = NARRATIVE_ROLES, rand = Math.rand
     return a;
   };
   const all = Object.keys(roles);
-  const picked = [];
-  const pool = shuffle(all);
-  const missingTarget = (k) => { const t = roles[k].requires; return t && !picked.includes(t) ? t : null; };
-  while (picked.length < Math.min(count, all.length) && pool.length) {
-    const free = Math.min(count, all.length) - picked.length;
-    const i = pool.findIndex(k => !missingTarget(k) || free >= 2);
-    if (i < 0) break;
-    const [k] = pool.splice(i, 1);
-    const target = missingTarget(k);
-    if (target) { picked.push(target); pool.splice(pool.indexOf(target), 1); }
-    picked.push(k);
+  const limit = Math.min(count, all.length);
+
+  // Greedy, in random order. It can paint itself into a corner (the last free seat can't take a pair), so retry; a closed
+  // set of every size exists, so a retry succeeds almost at once.
+  let picked = [];
+  for (let attempt = 0; attempt < 200; attempt++) {
+    picked = [];
+    const pool = shuffle(all);
+    const missing = (k) => requiredRoles(k, roles).filter(t => !picked.includes(t));
+    while (picked.length < limit && pool.length) {
+      const free = limit - picked.length;
+      const i = pool.findIndex(k => missing(k).length + 1 <= free);
+      if (i < 0) break;
+      const [k] = pool.splice(i, 1);
+      for (const t of missing(k)) { picked.push(t); pool.splice(pool.indexOf(t), 1); }
+      picked.push(k);
+    }
+    if (picked.length === limit) break;
   }
+
   const extras = shuffle(all);
   for (let n = 0; picked.length < count; n++) picked.push(extras[n % extras.length]);
   return shuffle(picked);
@@ -466,6 +605,133 @@ export function pickRandomRoles(count, roles = NARRATIVE_ROLES, rand = Math.rand
 export function pickChatTip(roleKey, rand = Math.random) {
   const pool = [HUSS_TIP, ...(NARRATIVE_ROLES[roleKey]?.tips || [])];
   return `Tip: ${pool[Math.floor(rand() * pool.length)]}`;
+}
+
+// ── Missions: win conditions, claims and review ──────────────────────────────
+// A role's `win` is one of: "meet" or "identify" (a claim with photo proof naming the people involved, approved by the
+// organiser) or "board" (judged automatically from the player's best Crew Suspect Board check). A claim slot names a
+// `role` (that exact role) or a `faction` (any member of it). The player never learns whether a claim is right until the
+// organiser has reviewed it, otherwise trying names one by one would reveal who holds which role.
+export const winOf = (roleKey) => NARRATIVE_ROLES[roleKey]?.win || null;
+
+// Why a role's win condition can't be completed with this crew, or null if it can. `people` is a list of user docs with ids.
+export function unachievableWin(roleKey, people, selfId) {
+  const win = winOf(roleKey);
+  if (!win || win.type === "board") return null;
+  const others = (people || []).filter(p => p.id !== selfId);
+  const needed = {};
+  for (const sl of win.slots) {
+    if (sl.role) {
+      if (!others.some(p => p.narrativeRole === sl.role)) return `no ${NARRATIVE_ROLES[sl.role].title} is assigned`;
+    } else if (sl.faction) needed[sl.faction] = (needed[sl.faction] || 0) + 1;
+  }
+  for (const [f, n] of Object.entries(needed)) {
+    const have = others.filter(p => NARRATIVE_ROLES[p.narrativeRole]?.faction === f).length;
+    if (have < n) return `it needs ${n} ${NARRATIVE_FACTIONS[f].short} member${n === 1 ? "" : "s"} but only ${have} ${have === 1 ? "is" : "are"} assigned`;
+  }
+  return null;
+}
+
+// Checks a claim's picks (one player id per slot, in order) against the roles actually assigned.
+export function evaluateClaim(roleKey, picks, users, selfUid) {
+  const slots = winOf(roleKey)?.slots || [];
+  const results = slots.map((sl, i) => {
+    const id = picks?.[i];
+    const u = id ? users?.[id] : null;
+    if (!u || id === selfUid) return false;
+    if (picks.indexOf(id) !== i) return false; // naming the same person twice only counts once
+    if (sl.role) return u.narrativeRole === sl.role;
+    if (sl.faction) return NARRATIVE_ROLES[u.narrativeRole]?.faction === sl.faction;
+    return false;
+  });
+  return { slots: results, ok: slots.length > 0 && results.every(Boolean) };
+}
+
+export function buildClaim({ id, claimantId, roleKey, picks, note, now = Date.now() }) {
+  return { id, claimantId, roleKey, picks: [...picks], note: (note || "").trim().slice(0, 300), status: "pending", createdAt: now };
+}
+
+export function reviewedClaim(claim, decision, note, reviewerId, now = Date.now()) {
+  return { ...claim, status: decision, reviewNote: (note || "").trim().slice(0, 300), reviewedBy: reviewerId, reviewedAt: now };
+}
+
+// Where a player stands on their mission, from the shared list of claims.
+export function missionStatus(uid, claims) {
+  const mine = Object.values(claims || {}).filter(c => c && c.claimantId === uid);
+  const approved = mine.find(c => c.status === "approved");
+  if (approved) return { state: "approved", claim: approved };
+  const pending = mine.find(c => c.status === "pending");
+  if (pending) return { state: "pending", claim: pending };
+  const rejected = mine.filter(c => c.status === "rejected").sort((a, b) => (b.reviewedAt || 0) - (a.reviewedAt || 0))[0];
+  return rejected ? { state: "rejected", claim: rejected } : { state: "none", claim: null };
+}
+
+// "board" missions are met automatically once the player's best check reaches the required share.
+export function boardMissionMet(roleKey, score) {
+  const win = winOf(roleKey);
+  if (win?.type !== "board" || !score || !(score.bestTotal > 0)) return false;
+  return score.bestCorrect / score.bestTotal >= win.minShare;
+}
+
+// How many missions are complete across the crew. A count only: naming who would hint at who holds a role.
+export function completedMissionCount(users, claims, scores) {
+  return Object.entries(users || {}).filter(([id, u]) => {
+    const win = winOf(u?.narrativeRole);
+    if (!win) return false;
+    return win.type === "board" ? boardMissionMet(u.narrativeRole, scores?.[id]) : missionStatus(id, claims).state === "approved";
+  }).length;
+}
+
+export const MAX_PROOF_FILE = 15 * 1024 * 1024;
+export const MAX_PROOF_CHARS = 600000; // keeps a proof document well under Firestore's 1 MiB limit
+
+// Turns a chosen photo into a small JPEG data URL. Phone photos are several MB, so unlike profile pictures this shrinks them
+// rather than rejecting them. `compress` is a parameter so tests need no canvas.
+export async function prepareProofPhoto(file, compress = compressImage) {
+  if (!file || !/^image\//.test(file.type || "")) throw new Error("Please choose an image file.");
+  if (file.size > MAX_PROOF_FILE) throw new Error("That photo is too large. Please choose one under 15 MB.");
+  const dataUrl = await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(new Error("Couldn't read that photo."));
+    r.readAsDataURL(file);
+  });
+  let out = await compress(dataUrl, 900, 0.6);
+  if (out.length > MAX_PROOF_CHARS) out = await compress(dataUrl, 640, 0.5);
+  if (out.length > MAX_PROOF_CHARS) throw new Error("Couldn't shrink that photo enough. Try a smaller one.");
+  return out;
+}
+
+// Saves a claim. The photo goes in its own document (loaded only when someone opens it, so the shared claim list stays
+// small) and is written first, so a reviewer never sees a claim without its photo.
+export async function submitMissionClaim({ claimantId, roleKey, picks, note, photo, users, claims }) {
+  const win = winOf(roleKey);
+  if (!win || win.type === "board") throw new Error("Your mission doesn't use claims.");
+  if (!photo) throw new Error("Add a proof photo first.");
+  if (!Array.isArray(picks) || picks.length !== win.slots.length || picks.some(p => !p) || new Set(picks).size !== picks.length || picks.includes(claimantId)) {
+    throw new Error("Pick a different crew member for each part of your mission.");
+  }
+  if (picks.some(p => !users?.[p])) throw new Error("One of the people you picked is no longer in the crew.");
+  const { state } = missionStatus(claimantId, claims);
+  if (state === "approved") throw new Error("Your mission is already complete.");
+  if (state === "pending") throw new Error("You already have a claim waiting for review.");
+  const id = uid();
+  const claim = buildClaim({ id, claimantId, roleKey, picks, note });
+  await fsSet("missionProofs", id, { id, claimantId, photo });
+  await fsSet("missionClaims", id, claim);
+  return claim;
+}
+
+// Approves or rejects a pending claim. An approval is refused unless the claim matches the assigned roles.
+export async function reviewMissionClaim({ claim, decision, note, reviewerId, users }) {
+  if (decision !== "approved" && decision !== "rejected") throw new Error("Choose approve or reject.");
+  if (claim?.status !== "pending") throw new Error("This claim has already been reviewed.");
+  if (decision === "approved" && !evaluateClaim(claim.roleKey, claim.picks, users, claim.claimantId).ok) {
+    throw new Error("This claim doesn't match the assigned roles, so it can't be approved.");
+  }
+  const next = reviewedClaim(claim, decision, note, reviewerId);
+  await fsSet("missionClaims", claim.id, next);
+  return next;
 }
 
 const GAME_CATS = ["Light","Medium","Heavy","Party","2 Player"];
@@ -1041,7 +1307,7 @@ export function OnboardingModal({ctx}){
       icon:"📁",
       title:"Your Dossier",
       subtitle:"A classified mission — eyes only",
-      body:"Crew members may be handed a secret role. If you are one of them, your sealed dossier waits at the top of your Personal Log. Tap it to read your cover story, objectives and orders, and make sure no one is looking over your shoulder.",
+      body:"Crew members may be handed a secret role. If you are one of them, your sealed dossier waits at the top of your Personal Log. Tap it to read your cover story, objectives and orders, and make sure no one is looking over your shoulder. It also holds your win condition: claim it with a photo as proof.",
       note:"Never show your dossier to anyone. Not even a friend. Especially not a friend.",
       color:"#F87171",
     },
@@ -1565,6 +1831,7 @@ export default function App(){
   const [costSettings, setCostSettings] = useState({});
   const [itinMeta,    setItinMeta]    = useState({});
   const [suspectScores, setSuspectScores] = useState({});
+  const [missionClaims, setMissionClaims] = useState({});
   const [view,      setView]      = useState("login");
   const [toast,    setToast]    = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1605,6 +1872,7 @@ export default function App(){
       subCol("receipts",   setReceipts),
       subCol("itinerary",  setItinerary),
       subCol("suspectScores", setSuspectScores),
+      subCol("missionClaims", setMissionClaims),
       subCol("settings",   d=>{setCostSettings(d?.costCalc||{});setItinMeta(d?.itinMeta||{});}),
       onSnapshot(collection(db,"notifications"), s=>{
         // Listen for new notifications and show in-app toast for current user.
@@ -1756,6 +2024,24 @@ export default function App(){
     catch(e){ console.error("[suspectScores] save failed:", e); showToast("⚠️ Couldn't save your score. Check your connection and try again."); }
   };
 
+  // Sends a win-condition claim with its proof photo for the organiser to review
+  const doSubmitMissionClaim = async ({picks, note, photo}) => {
+    try{
+      await submitMissionClaim({claimantId:authUser.uid, roleKey:users[authUser.uid]?.narrativeRole||profile?.narrativeRole, picks, note, photo, users, claims:missionClaims});
+      showToast("📸 Claim sent for review!");
+      return true;
+    }catch(e){ showToast(`⚠️ ${e.message||"Couldn't send your claim."}`); return false; }
+  };
+
+  // Engine Room: approve or reject a claim
+  const doReviewMissionClaim = async (claim, decision, note) => {
+    try{
+      await reviewMissionClaim({claim, decision, note, reviewerId:authUser.uid, users});
+      showToast(decision==="approved"?"✓ Claim approved":"Claim rejected");
+      return true;
+    }catch(e){ showToast(`⚠️ ${e.message||"Couldn't save that decision."}`); return false; }
+  };
+
   // Engine Room: replay the welcome tour for everyone
   const doResetOnboarding = async () => {
     const result = await resetOnboardingForAll(Object.keys(users));
@@ -1788,7 +2074,7 @@ export default function App(){
     doSaveFood,doDelFood,doSaveSupply,doDelSupply,
     doSaveMenuItem,doDelMenuItem,doClaimSlot,doUnclaimSlot,doInitDeckHands,
     doSaveReceipt,doDelReceipt,
-    doSaveItinDay,doDelItinDay,doSaveDeckSlot,doDelDeckSlot,doSetDeposit,doSetRank,doSendNotification,doSaveCostSettings,costSettings,doSaveItinMeta,itinMeta,doAssignNarrativeRole,suspectScores,doRecordSuspectCheck,doResetOnboarding,
+    doSaveItinDay,doDelItinDay,doSaveDeckSlot,doDelDeckSlot,doSetDeposit,doSetRank,doSendNotification,doSaveCostSettings,costSettings,doSaveItinMeta,itinMeta,doAssignNarrativeRole,suspectScores,doRecordSuspectCheck,missionClaims,doSubmitMissionClaim,doReviewMissionClaim,doResetOnboarding,
     notifPerm,notifSupported,requestPermission};
 
   return <>
@@ -4278,6 +4564,7 @@ export function BggIndexManager({ctx}){
 
 export function EngineRoom({ctx}){
   const [tab,setTab]=useState("itinerary");
+  const waitingClaims=Object.values(ctx.missionClaims||{}).filter(c=>c?.status==="pending").length;
   const [unlocked,setUnlocked]=useState(false);
   const [pwInput,setPwInput]=useState("");
   const [pwErr,setPwErr]=useState("");
@@ -4301,7 +4588,7 @@ export function EngineRoom({ctx}){
     <div className="cc-fade">
       <SectionTitle sub="Manage itinerary days and deck hand duties">Engine Room</SectionTitle>
       <div style={{display:"flex",gap:8,marginBottom:22,flexWrap:"wrap"}}>
-        {[["itinerary","🗓 Itinerary Days"],["deckslots","⚙️ Deck Hand Slots"],["deposits","💰 Deposits"],["ranks","⚓ Crew Ranks"],["notify","📨 Notify"],["costs","🧮 Cost Calculator"],["bgg","📚 BGG Index"],["narrative","🎭 Narrative Roles"],["tour","👋 Welcome Tour"]].map(([id,label])=>(
+        {[["itinerary","🗓 Itinerary Days"],["deckslots","⚙️ Deck Hand Slots"],["deposits","💰 Deposits"],["ranks","⚓ Crew Ranks"],["notify","📨 Notify"],["costs","🧮 Cost Calculator"],["bgg","📚 BGG Index"],["narrative","🎭 Narrative Roles"],["claims",`📸 Mission Claims${waitingClaims?` (${waitingClaims})`:""}`],["tour","👋 Welcome Tour"]].map(([id,label])=>(
           <button key={id} onClick={()=>setTab(id)} style={{fontFamily:"'Cinzel',serif",fontSize:12,fontWeight:700,padding:"7px 16px",borderRadius:5,cursor:"pointer",border:`2px solid ${tab===id?T.amber:T.border}`,background:tab===id?T.amberSoft:"transparent",color:tab===id?T.amber:T.muted,transition:"all .15s"}}>{label}</button>
         ))}
       </div>
@@ -4313,9 +4600,129 @@ export function EngineRoom({ctx}){
       {tab==="costs"&&<CostCalculator ctx={ctx}/>}
       {tab==="bgg"&&<BggIndexManager ctx={ctx}/>}
       {tab==="narrative"&&<NarrativeManager ctx={ctx}/>}
+      {tab==="claims"&&<ClaimsReview ctx={ctx}/>}
       {tab==="tour"&&<WelcomeTourManager ctx={ctx}/>}
     </div>
   );
+}
+
+// ── Mission claims review (Engine Room) ───────────────────────────────────────
+// A claim's photo lives in its own document and is only fetched when the organiser asks to see it.
+export async function fetchProofPhoto(claimId) {
+  const snap = await getDoc(doc(db, "missionProofs", claimId));
+  return snap.exists() ? snap.data()?.photo || null : null;
+}
+
+const claimWhen = ts => ts ? new Date(ts).toLocaleString("en-CA",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "";
+
+function ClaimRow({claim,users,onReview}){
+  const claimant=users?.[claim.claimantId];
+  const role=NARRATIVE_ROLES[claim.roleKey];
+  const fac=role?NARRATIVE_FACTIONS[role.faction]:null;
+  const slots=winOf(claim.roleKey)?.slots||[];
+  const check=evaluateClaim(claim.roleKey,claim.picks,users,claim.claimantId);
+  const [photo,setPhoto]=useState(undefined); // undefined: not fetched yet, null: none found, string: the image
+  const [loading,setLoading]=useState(false);
+  const [note,setNote]=useState("");
+  const [busy,setBusy]=useState(false);
+
+  const showPhoto=async()=>{
+    setLoading(true);
+    try{ setPhoto(await fetchProofPhoto(claim.id)); }catch{ setPhoto(null); }
+    setLoading(false);
+  };
+  const decide=async d=>{ setBusy(true); await onReview(claim,d,note); setBusy(false); };
+  const small={fontSize:11,color:T.hint};
+
+  return <div style={{background:T.bgMid,border:`1.5px solid ${fac?.border||T.border2}`,borderRadius:7,padding:"12px 14px"}}>
+    <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:8}}>
+      <Avatar name={claimant?.name} picture={claimant?.picture} size={32}/>
+      <div style={{flex:1,minWidth:140}}>
+        <div style={{fontFamily:"'Cinzel',serif",fontSize:13,fontWeight:700,color:T.text}}>{claimant?.name||"Former crew member"}</div>
+        <div style={{fontSize:11,color:fac?.color||T.muted}}>{role?`${role.icon} ${role.title}`:"No role"}</div>
+      </div>
+      <div style={small}>{claimWhen(claim.createdAt)}</div>
+    </div>
+
+    <div style={{fontSize:12,color:T.muted,marginBottom:8,fontStyle:"italic"}}>{winOf(claim.roleKey)?.text}</div>
+
+    <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:8}}>
+      {slots.map((sl,i)=>{
+        const picked=users?.[claim.picks?.[i]];
+        const actual=NARRATIVE_ROLES[picked?.narrativeRole];
+        const ok=check.slots[i];
+        return <div key={i} data-testid="claim-slot" style={{fontSize:12,color:T.text,display:"flex",gap:8,alignItems:"baseline",flexWrap:"wrap"}}>
+          <span style={{color:ok?"#4ADE80":T.danger,fontWeight:700}}>{ok?"✓":"✗"}</span>
+          <span style={{color:T.muted}}>{sl.label}:</span>
+          <strong>{picked?.name||"Former crew member"}</strong>
+          <span style={small}>{ok?"matches":`actually ${actual?actual.title:"no role"}`}</span>
+        </div>;
+      })}
+    </div>
+
+    {claim.note&&<div style={{fontSize:12,color:T.muted,marginBottom:8}}>"{claim.note}"</div>}
+
+    {photo===undefined
+      ?<button type="button" disabled={loading} onClick={showPhoto}
+        style={{fontFamily:"'Cinzel',serif",fontSize:11,fontWeight:700,padding:"6px 12px",borderRadius:5,cursor:"pointer",border:`1.5px solid ${T.border2}`,background:T.surface2,color:T.text}}>
+        {loading?"Loading photo…":"📷 View photo"}
+      </button>
+      :photo===null
+        ?<div role="alert" style={{fontSize:12,color:T.danger}}>No proof photo was found for this claim.</div>
+        :<img src={photo} alt="Proof photo" style={{maxWidth:"100%",maxHeight:320,borderRadius:6,border:`1.5px solid ${T.border2}`}}/>}
+
+    {!check.ok&&<div style={{fontSize:11,color:T.danger,marginTop:8}}>This doesn't match the assigned roles, so it can't be approved.</div>}
+
+    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10,alignItems:"center"}}>
+      <input aria-label="Note to the player" value={note} maxLength={300} onChange={e=>setNote(e.target.value)} placeholder="Note to the player (optional)"
+        style={{flex:1,minWidth:160,fontFamily:"inherit",fontSize:12,padding:"7px 10px",borderRadius:5,background:T.surface2,color:T.text,border:`1.5px solid ${T.border2}`}}/>
+      <Btn size="sm" disabled={!check.ok||busy||photo===null} onClick={()=>decide("approved")}>✓ Approve</Btn>
+      <Btn size="sm" variant="danger" disabled={busy} onClick={()=>decide("rejected")}>✗ Reject</Btn>
+    </div>
+  </div>;
+}
+
+export function ClaimsReview({ctx}){
+  const {users,missionClaims,doReviewMissionClaim}=ctx;
+  const all=Object.values(missionClaims||{}).filter(Boolean);
+  const pending=all.filter(c=>c.status==="pending").sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  const reviewed=all.filter(c=>c.status!=="pending").sort((a,b)=>(b.reviewedAt||0)-(a.reviewedAt||0));
+  const done=completedMissionCount(users,missionClaims,ctx.suspectScores);
+
+  return <div>
+    <h3 style={{fontFamily:"'Cinzel',serif",fontSize:14,color:T.amber,margin:"0 0 10px"}}>📸 Mission Claims</h3>
+    <p style={{fontSize:12,color:T.muted,marginBottom:16,lineHeight:1.6}}>
+      Players claim their win condition with a photo as proof. Check the photo, then approve or reject. A claim that doesn't match
+      the assigned roles can't be approved. Players are only told the outcome, never which part was wrong.
+      {done>0&&` ${done} mission${done===1?"":"s"} complete so far.`}
+    </p>
+
+    <div style={{fontFamily:"'Cinzel',serif",fontSize:11,fontWeight:700,color:T.amber,textTransform:"uppercase",letterSpacing:".08em",marginBottom:8}}>
+      Waiting for review ({pending.length})
+    </div>
+    {pending.length===0
+      ?<p style={{fontSize:12,color:T.hint,fontStyle:"italic",margin:"0 0 18px"}}>No claims waiting.</p>
+      :<div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
+        {pending.map(c=><ClaimRow key={c.id} claim={c} users={users} onReview={doReviewMissionClaim}/>)}
+      </div>}
+
+    {reviewed.length>0&&<>
+      <div style={{fontFamily:"'Cinzel',serif",fontSize:11,fontWeight:700,color:T.muted,textTransform:"uppercase",letterSpacing:".08em",marginBottom:8}}>
+        Reviewed ({reviewed.length})
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+        {reviewed.map(c=>{
+          const ok=c.status==="approved";
+          return <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",padding:"7px 10px",borderRadius:6,background:T.bgMid,border:`1px solid ${T.border}`}}>
+            <span style={{fontSize:12,fontWeight:700,color:ok?"#4ADE80":T.danger}}>{ok?"✓ Approved":"✗ Rejected"}</span>
+            <span style={{flex:1,minWidth:100,fontSize:12,color:T.text}}>{users?.[c.claimantId]?.name||"Former crew member"}</span>
+            {c.reviewNote&&<span style={{fontSize:11,color:T.muted,fontStyle:"italic"}}>"{c.reviewNote}"</span>}
+            <span style={{fontSize:11,color:T.hint}}>{claimWhen(c.reviewedAt)}</span>
+          </div>;
+        })}
+      </div>
+    </>}
+  </div>;
 }
 
 // ── Welcome Tour reset (Engine Room) ─────────────────────────────────────────
@@ -4417,7 +4824,9 @@ export function NarrativeManager({ctx}){
       {uList.map(u=>{
         const current=NARRATIVE_ROLES[u.narrativeRole];
         const fac=current?NARRATIVE_FACTIONS[current.faction]:null;
-        const noTarget=current?.requires&&!assigned.has(current.requires)?NARRATIVE_ROLES[current.requires].title:null;
+        const missingTitles=u.narrativeRole?requiredRoles(u.narrativeRole).filter(r=>!assigned.has(r)).map(r=>NARRATIVE_ROLES[r].title):[];
+        const noTarget=missingTitles.length?missingTitles.join(" and "):null;
+        const stuck=u.narrativeRole?unachievableWin(u.narrativeRole,uList,u.id):null;
         return <div key={u.id} style={{background:T.bgMid,border:`1.5px solid ${fac?.border||T.border2}`,borderRadius:7,padding:"12px 14px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
           <Avatar name={u.name} picture={u.picture} size={34}/>
           <div style={{flex:1,minWidth:0}}>
@@ -4426,7 +4835,8 @@ export function NarrativeManager({ctx}){
               ?<div style={{fontSize:11,color:fac?.color||T.muted,marginTop:2}}>{current.icon} {current.title}</div>
               :<div style={{fontSize:11,color:T.hint,marginTop:2,fontStyle:"italic"}}>No role assigned</div>
             }
-            {noTarget&&<div style={{fontSize:11,color:T.danger,marginTop:3}}>⚠️ No {noTarget} is assigned, so this role has nobody to target</div>}
+            {noTarget&&<div style={{fontSize:11,color:T.danger,marginTop:3}}>⚠️ No {noTarget} {missingTitles.length>1?"are":"is"} assigned, so this role has nobody to target</div>}
+            {!noTarget&&stuck&&<div style={{fontSize:11,color:T.danger,marginTop:3}}>⚠️ Win condition can't be completed: {stuck}</div>}
           </div>
           <select
             value={u.narrativeRole||""}
@@ -4637,9 +5047,136 @@ export function RoleGuessBoard({uid,users,allScores,onRecordCheck}){
   </Card>;
 }
 
+// ── Proof photo picker ────────────────────────────────────────────────────────
+function ProofPhotoPicker({photo,onPhoto,compress,hint}){
+  const fileRef=useRef(null);
+  const [busy,setBusy]=useState(false);
+  const [err,setErr]=useState("");
+  const choose=async e=>{
+    const f=e.target.files?.[0];
+    e.target.value="";
+    if(!f) return;
+    setBusy(true); setErr("");
+    try{ onPhoto(await prepareProofPhoto(f,compress)); }
+    catch(ex){ setErr(ex.message||"Couldn't use that photo."); }
+    setBusy(false);
+  };
+  const btn={fontFamily:"'Cinzel',serif",fontSize:11,fontWeight:700,padding:"7px 12px",borderRadius:5,cursor:"pointer",
+    border:`1.5px solid ${T.border2}`,background:T.surface2,color:T.text};
+  return <div>
+    <input ref={fileRef} type="file" accept="image/*" aria-label="Proof photo" onChange={choose} style={{display:"none"}}/>
+    {photo
+      ?<div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+        <img src={photo} alt="Proof preview" style={{width:76,height:76,objectFit:"cover",borderRadius:6,border:`1.5px solid ${T.border2}`}}/>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button type="button" onClick={()=>fileRef.current?.click()} style={btn}>Change photo</button>
+          <button type="button" onClick={()=>onPhoto("")} style={{...btn,color:T.muted}}>Remove</button>
+        </div>
+      </div>
+      :<button type="button" disabled={busy} onClick={()=>fileRef.current?.click()} style={{...btn,opacity:busy?.6:1}}>
+        {busy?"Preparing photo…":"📷 Add proof photo"}
+      </button>}
+    {hint&&<div style={{fontSize:11,color:T.hint,marginTop:6,lineHeight:1.5}}>{hint}</div>}
+    {err&&<div role="alert" style={{fontSize:12,color:T.danger,marginTop:6,padding:"6px 10px",background:T.dangerBg,borderRadius:5,border:`1px solid ${T.danger}44`}}>{err}</div>}
+  </div>;
+}
+
+// ── Mission card (win condition + claim with photo proof) ─────────────────────
+export function MissionCard({roleKey,uid,users,claims,scores,onSubmit,compress,fac}){
+  const win=winOf(roleKey);
+  const [picks,setPicks]=useState([]);
+  const [note,setNote]=useState("");
+  const [photo,setPhoto]=useState("");
+  const [busy,setBusy]=useState(false);
+  if(!win) return null;
+
+  const border=fac?.border||T.border2;
+  const labelStyle={fontSize:11,fontWeight:700,color:fac?.color||T.amber,textTransform:"uppercase",letterSpacing:".08em",fontFamily:"'Cinzel',serif"};
+  const crew=Object.entries(users||{}).filter(([id])=>id!==uid).map(([id,u])=>({...u,id}))
+    .sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+  const done=completedMissionCount(users,claims,scores);
+  const status=missionStatus(uid,claims);
+  const slots=win.slots||[];
+  const complete=slots.length>0&&picks.length===slots.length&&picks.every(Boolean)&&new Set(picks).size===picks.length;
+  const canSend=complete&&!!photo&&!busy;
+
+  const send=async()=>{
+    setBusy(true);
+    const ok=await onSubmit?.({picks,note,photo});
+    setBusy(false);
+    if(ok){ setPicks([]); setNote(""); setPhoto(""); }
+  };
+  const setPick=(i,id)=>setPicks(p=>{ const n=[...p]; n[i]=id; return n; });
+
+  const banner=(text,color,bg,line)=><div role="status" style={{marginTop:12,padding:"10px 14px",borderRadius:6,textAlign:"center",
+    border:`1.5px solid ${line}`,background:bg,color,fontFamily:"'Cinzel',serif",fontSize:13,fontWeight:700}}>{text}</div>;
+
+  let body;
+  if(win.type==="board"){
+    const sc=scores?.[uid];
+    const share=sc&&sc.bestTotal>0?Math.round(100*sc.bestCorrect/sc.bestTotal):null;
+    const met=boardMissionMet(roleKey,sc);
+    body=<>
+      <div style={{fontSize:12,color:T.muted,lineHeight:1.6}}>
+        Judged automatically from your best Crew Suspect Board check. You need {Math.round(100*win.minShare)}% or better.
+        {share===null?" You haven't checked your guesses yet.":` Your best so far is ${share}%.`}
+      </div>
+      {met&&banner("🎉 Mission accomplished!","#4ADE80","#162A1E","#166534")}
+    </>;
+  } else if(status.state==="approved"){
+    body=<>
+      {banner("🎉 Mission accomplished!","#4ADE80","#162A1E","#166534")}
+      {status.claim.reviewNote&&<div style={{fontSize:12,color:T.muted,marginTop:8,fontStyle:"italic",textAlign:"center"}}>Organiser's note: {status.claim.reviewNote}</div>}
+    </>;
+  } else if(status.state==="pending"){
+    body=banner("⏳ Claim sent. Waiting for the organiser to review your proof.",T.amber,T.bgMid,`${T.amber}55`);
+  } else {
+    body=<>
+      {status.state==="rejected"&&<div role="status" style={{marginBottom:12,padding:"9px 12px",borderRadius:6,fontSize:12,lineHeight:1.5,
+        color:T.danger,background:T.dangerBg,border:`1px solid ${T.danger}44`}}>
+        Your last claim wasn't approved.{status.claim.reviewNote?` Organiser's note: ${status.claim.reviewNote}`:""} You can send a new one.
+      </div>}
+      <div style={{fontSize:12,color:T.muted,marginBottom:12,lineHeight:1.6}}>
+        Claim it with a photo as proof. The organiser reviews every claim, so you won't be told straight away whether you picked the right people.
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {slots.map((sl,i)=>(
+          <div key={i}>
+            <label style={{display:"block",fontSize:11,fontWeight:600,color:T.muted,textTransform:"uppercase",letterSpacing:".06em",marginBottom:4}}>{sl.label}</label>
+            <select aria-label={sl.label} value={picks[i]||""} onChange={e=>setPick(i,e.target.value)}
+              style={{width:"100%",fontFamily:"inherit",fontSize:13,padding:"8px 10px",borderRadius:5,background:T.surface2,color:T.text,border:`1.5px solid ${T.border2}`}}>
+              <option value="">— Choose a crew member —</option>
+              {crew.map(c=><option key={c.id} value={c.id} disabled={picks.includes(c.id)&&picks[i]!==c.id}>{c.name||"Crew member"}</option>)}
+            </select>
+          </div>
+        ))}
+        <div>
+          <label style={{display:"block",fontSize:11,fontWeight:600,color:T.muted,textTransform:"uppercase",letterSpacing:".06em",marginBottom:4}}>Where and when? (optional)</label>
+          <input aria-label="Where and when" value={note} maxLength={300} onChange={e=>setNote(e.target.value)} placeholder="e.g. by the fire, Friday night"
+            style={{width:"100%",boxSizing:"border-box",fontFamily:"inherit",fontSize:13,padding:"8px 10px",borderRadius:5,background:T.surface2,color:T.text,border:`1.5px solid ${T.border2}`}}/>
+        </div>
+        <ProofPhotoPicker photo={photo} onPhoto={setPhoto} compress={compress} hint={win.proofHint}/>
+        <Btn onClick={send} disabled={!canSend} style={{width:"100%"}}>{busy?"Sending…":"📸 Send claim for review"}</Btn>
+        {!canSend&&!busy&&<div style={{fontSize:11,color:T.hint,textAlign:"center"}}>
+          {!complete?"Choose a different crew member for each part.":"Add a proof photo to send your claim."}
+        </div>}
+      </div>
+    </>;
+  }
+
+  return <Card style={{marginBottom:14,border:`1.5px solid ${border}44`}}>
+    <div style={{...labelStyle,marginBottom:8}}>🏁 Win Condition</div>
+    <p style={{fontSize:14,color:T.text,lineHeight:1.6,margin:"0 0 12px",fontWeight:600}}>{win.text}</p>
+    {body}
+    <div style={{fontSize:11,color:T.hint,marginTop:12,textAlign:"center"}}>
+      {done===0?"No missions completed yet.":`🏁 ${done} mission${done===1?"":"s"} completed across the crew.`}
+    </div>
+  </Card>;
+}
+
 // ── Narrative Dossier (player view) ──────────────────────────────────────────
 export function NarrativeDossier({ctx}){
-  const {profile,authUser,users,suspectScores,doRecordSuspectCheck}=ctx;
+  const {profile,authUser,users,suspectScores,doRecordSuspectCheck,missionClaims,doSubmitMissionClaim,proofCompress}=ctx;
   // Read the live user doc: `profile` is loaded once at sign-in, so it would miss a role assigned afterwards
   const me=(authUser&&users?.[authUser.uid])||profile;
   const roleKey=me?.narrativeRole;
@@ -4724,6 +5261,10 @@ export function NarrativeDossier({ctx}){
             ))}
           </div>
         </Card>
+
+        {/* Win condition and claim */}
+        {authUser&&<MissionCard roleKey={roleKey} uid={authUser.uid} users={users} claims={missionClaims} scores={suspectScores}
+          onSubmit={doSubmitMissionClaim} compress={proofCompress} fac={fac}/>}
 
         {/* Field intelligence note */}
         <Card style={{border:`1.5px solid ${T.amber}44`,background:T.bgMid}}>
