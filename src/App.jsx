@@ -950,7 +950,7 @@ export function DietPills({selected,onToggle}){
 // ── Main App ──────────────────────────────────────────────────────────────────
 
 // ── Onboarding Modal ──────────────────────────────────────────────────────────
-function OnboardingModal({ctx}){
+export function OnboardingModal({ctx}){
   const {profile,doUpdateProfile}=ctx;
 
   // Show when profile exists and onboarded is explicitly false
@@ -970,6 +970,7 @@ function OnboardingModal({ctx}){
       title:"Welcome aboard, " + (profile?.name?.split(" ")[0]||"Crew") + "!",
       subtitle:"Cottage Con · Nov 26–29 · The Yellow Cottage",
       body:"This app is your digital companion for the weekend — track games, coordinate food, sign up for duties, and follow the itinerary. Here's a quick tour of each section.",
+      note:"A secret war is being fought aboard this voyage. The Empire, the Rebellion, and those who answer to neither are all among the crew. Trust carefully.",
       color:T.amber,
     },
     {
@@ -977,6 +978,7 @@ function OnboardingModal({ctx}){
       title:"Bridge",
       subtitle:"Your mission control",
       body:"The Bridge is your home screen. It shows the countdown to departure, crew stats, and a live leaderboard of the most voted games. Tap any stat card to jump to that section.",
+      note:"Watch the votes. Allegiances have a way of showing up in the strangest places.",
       color:T.amber,
     },
     {
@@ -984,6 +986,7 @@ function OnboardingModal({ctx}){
       title:"Itinerary",
       subtitle:"The voyage plan",
       body:"See the full weekend schedule — check-in details, the cottage address with a map, and day-by-day activities. The Engine Room lets the organiser update this live.",
+      note:"Every gathering is a chance to share a secret — or steal one.",
       color:T.steam,
     },
     {
@@ -991,6 +994,7 @@ function OnboardingModal({ctx}){
       title:"Cargo Hold",
       subtitle:"Board game library",
       body:"Browse all the games being brought to the cottage. Vote for the ones you want to play, request games nobody owns yet, and filter by weight category — Light, Medium, Heavy, Party, or 2-Player.",
+      note:"Crates have false bottoms. Mind what's really in the hold.",
       color:"#FCD34D",
     },
     {
@@ -998,6 +1002,7 @@ function OnboardingModal({ctx}){
       title:"Galley",
       subtitle:"Food, gear & menu",
       body:"Log what food and supplies you're bringing so the group can coordinate. The Voyage Menu lets everyone plan breakfast, lunch, and dinner for each day.",
+      note:"Even spies get hungry. A shared meal loosens tongues.",
       color:"#4ADE80",
     },
     {
@@ -1005,6 +1010,7 @@ function OnboardingModal({ctx}){
       title:"Deck Hands",
       subtitle:"Duties & crew roster",
       body:"Sign up for preparation and cleanup slots each day. You'll see the full crew roster here too, with everyone's rank — Officer (adult), Enlisted (kid), or Stowaway (day visitor).",
+      note:"A duty roster makes a fine alibi — and a fine way to learn who is busy, and when.",
       color:T.muted,
     },
     {
@@ -1012,6 +1018,7 @@ function OnboardingModal({ctx}){
       title:"Manifest",
       subtitle:"Expense tracking",
       body:"Snap a photo of any shared receipts. The Manifest tracks who paid for what and keeps a running total so splitting costs at the end is easy.",
+      note:"Receipts don't lie. People do.",
       color:T.copper,
     },
     {
@@ -1019,14 +1026,32 @@ function OnboardingModal({ctx}){
       title:"Crew Assistant",
       subtitle:"Your space pirate AI",
       body:"Tap the 🏴‍☠️ button floating in the bottom-right corner of any page to chat with the AI assistant. Ask it what to play, who's bringing what, the schedule, game rules — it reads your crew's live data and answers fast.",
+      note:"It keeps your secrets, and now and then slips you a tip for your own mission.",
       color:T.steam,
     },
     {
       icon:"👤",
       title:"Personal Log",
       subtitle:"Your profile",
-      body:"Set your display name, profile photo, crew rank, and dietary restrictions. Your Personal Log also shows all your games, galley items, and duty assignments in one place.",
+      body:"Set your display name, profile photo, crew rank, and dietary restrictions. Your Personal Log also shows all your games, galley items, and duty assignments in one place — and it's where your classified dossier is kept.",
+      note:"A cover story starts with a name and a face. Choose yours wisely.",
       color:"#C084FC",
+    },
+    {
+      icon:"📁",
+      title:"Your Dossier",
+      subtitle:"A classified mission — eyes only",
+      body:"Crew members may be handed a secret role. If you are one of them, your sealed dossier waits at the top of your Personal Log. Tap it to read your cover story, objectives and orders, and make sure no one is looking over your shoulder.",
+      note:"Never show your dossier to anyone. Not even a friend. Especially not a friend.",
+      color:"#F87171",
+    },
+    {
+      icon:"🗂️",
+      title:"Crew Suspect Board",
+      subtitle:"Trust no one",
+      body:"Inside your dossier, mark who you think holds which role for every other crew member. Once everyone is marked, tap Check my guesses to see how many you got right. Better scores with fewer checks climb the leaderboard.",
+      note:"Your guesses stay private on your device. The leaderboard shows scores only, never who guessed what.",
+      color:T.steam,
     },
     (() => {
       const ua = navigator.userAgent;
@@ -1080,7 +1105,7 @@ function OnboardingModal({ctx}){
     <div style={{position:"fixed",inset:0,zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",
       background:"rgba(0,0,0,.75)",backdropFilter:"blur(6px)",padding:20}}>
       <div style={{background:T.bgMid,border:`3px solid ${current.color}55`,borderRadius:12,
-        maxWidth:420,width:"100%",position:"relative",overflow:"hidden",
+        maxWidth:420,width:"100%",position:"relative",overflowX:"hidden",overflowY:"auto",maxHeight:"calc(100dvh - 40px)",
         boxShadow:`0 0 60px ${current.color}22, 0 24px 48px rgba(0,0,0,.6)`,
         animation:"ccFade .25s ease"}}>
 
@@ -1105,9 +1130,17 @@ function OnboardingModal({ctx}){
           </div>
 
           {/* Body */}
-          <p style={{fontSize:14,color:T.muted,lineHeight:1.7,textAlign:"center",marginBottom:24,minHeight:72}}>
+          <p style={{fontSize:14,color:T.muted,lineHeight:1.7,textAlign:"center",marginBottom:current.note?14:24,minHeight:72}}>
             {current.body}
           </p>
+
+          {/* In-world flavour line */}
+          {current.note&&<div style={{marginBottom:22,padding:"10px 14px",borderRadius:6,background:T.bg,
+            border:`1px solid ${current.color}33`,borderLeft:`3px solid ${current.color}`}}>
+            <div style={{fontSize:9,fontWeight:700,letterSpacing:".1em",textTransform:"uppercase",color:current.color,
+              fontFamily:"'Cinzel',serif",marginBottom:4}}>🎭 Field Intelligence</div>
+            <div style={{fontSize:12,color:T.muted,fontStyle:"italic",lineHeight:1.6}}>{current.note}</div>
+          </div>}
 
           {/* Page dots */}
           <div style={{display:"flex",justifyContent:"center",gap:6,marginBottom:20}}>
