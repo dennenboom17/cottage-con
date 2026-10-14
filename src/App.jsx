@@ -144,11 +144,10 @@ export const NARRATIVE_ROLES = {
     ],
     win:{
       type:"identify",
-      text:"Identify two members of the Rebellion.",
+      text:"Identify {n} member{s} of the Rebellion.",
       proofHint:"A photo of the people you are naming, or the evidence that gave them away.",
       slots:[
-        {faction:"rebellion",label:"Rebellion member 1"},
-        {faction:"rebellion",label:"Rebellion member 2"},
+        {faction:"rebellion",count:2,label:"Rebellion member"},
       ],
     },
     tips:[
@@ -174,10 +173,10 @@ export const NARRATIVE_ROLES = {
     ],
     win:{
       type:"identify",
-      text:"Expose a member of the Rebellion, with proof.",
+      text:"Expose {n} member{s} of the Rebellion, with proof.",
       proofHint:"A photo of the people you are naming, or the evidence that gave them away.",
       slots:[
-        {faction:"rebellion",label:"Rebellion member"},
+        {faction:"rebellion",count:1,share:0.3,label:"Rebellion member"},
       ],
     },
     tips:[
@@ -203,11 +202,10 @@ export const NARRATIVE_ROLES = {
     ],
     win:{
       type:"identify",
-      text:"Identify two members of the Rebellion without blowing your cover.",
+      text:"Identify {n} member{s} of the Rebellion without blowing your cover.",
       proofHint:"A photo of the people you are naming, or the evidence that gave them away.",
       slots:[
-        {faction:"rebellion",label:"Rebellion member 1"},
-        {faction:"rebellion",label:"Rebellion member 2"},
+        {faction:"rebellion",count:2,label:"Rebellion member"},
       ],
     },
     tips:[
@@ -268,6 +266,7 @@ export const NARRATIVE_ROLES = {
       proofHint:"A photo of the people you are naming, or the evidence that gave them away.",
       slots:[
         {role:"smuggler",label:"The Black Market Smuggler"},
+        {role:"rebel_black_market_agent",minCrew:12,label:"The Rebel buyer",addText:" In a big game, also name the Rebel buying from them."},
       ],
     },
     tips:[
@@ -295,11 +294,10 @@ export const NARRATIVE_ROLES = {
     ],
     win:{
       type:"meet",
-      text:"Make contact with two of your fellow rebels.",
+      text:"Make contact with {n} of your fellow rebel{s}.",
       proofHint:"A photo of you with the person you met.",
       slots:[
-        {faction:"rebellion",label:"Rebel you met 1"},
-        {faction:"rebellion",label:"Rebel you met 2"},
+        {faction:"rebellion",count:2,label:"Rebel you met"},
       ],
     },
     tips:[
@@ -355,10 +353,10 @@ export const NARRATIVE_ROLES = {
     ],
     win:{
       type:"meet",
-      text:"Meet a rebel who needs extraction.",
+      text:"Meet {n} rebel{s} in need of extraction.",
       proofHint:"A photo of you with the person you met.",
       slots:[
-        {faction:"rebellion",label:"Rebel you met"},
+        {faction:"rebellion",count:1,share:0.3,label:"Rebel you met"},
       ],
     },
     tips:[
@@ -384,11 +382,10 @@ export const NARRATIVE_ROLES = {
     ],
     win:{
       type:"identify",
-      text:"Identify two Imperial agents.",
+      text:"Identify {n} Imperial agent{s}.",
       proofHint:"A photo of the people you are naming, or the evidence that gave them away.",
       slots:[
-        {faction:"empire",label:"Imperial agent 1"},
-        {faction:"empire",label:"Imperial agent 2"},
+        {faction:"empire",count:2,label:"Imperial agent"},
       ],
     },
     tips:[
@@ -418,6 +415,7 @@ export const NARRATIVE_ROLES = {
       proofHint:"A photo of you with the person you met.",
       slots:[
         {role:"arms_dealer",label:"The Freelance Arms Dealer"},
+        {faction:"rebellion",count:1,minCrew:12,label:"A fellow rebel who witnessed the deal",addText:" In a big game, bring a fellow rebel along as a witness."},
       ],
     },
     tips:[
@@ -448,6 +446,7 @@ export const NARRATIVE_ROLES = {
       proofHint:"A photo of you with the person you met.",
       slots:[
         {role:"smuggler",label:"The Black Market Smuggler"},
+        {faction:"rebellion",count:1,minCrew:12,label:"A fellow rebel who witnessed the deal",addText:" In a big game, bring a fellow rebel along as a witness."},
       ],
     },
     tips:[
@@ -535,7 +534,7 @@ export const NARRATIVE_ROLES = {
     ],
     win:{
       type:"board",
-      text:"Reach 60% correct on the Crew Suspect Board.",
+      text:"Reach {n} correct on the Crew Suspect Board.",
       minShare:0.6,
     },
     tips:[
@@ -609,21 +608,73 @@ export function pickChatTip(roleKey, rand = Math.random) {
 
 // ── Missions: win conditions, claims and review ──────────────────────────────
 // A role's `win` is one of: "meet" or "identify" (a claim with photo proof naming the people involved, approved by the
-// organiser) or "board" (judged automatically from the player's best Crew Suspect Board check). A claim slot names a
-// `role` (that exact role) or a `faction` (any member of it). The player never learns whether a claim is right until the
-// organiser has reviewed it, otherwise trying names one by one would reveal who holds which role.
+// organiser) or "board" (judged automatically from the player's Crew Suspect Board checks). The `win` in the role data is
+// a template: `resolveWin` turns it into the concrete claim for this crew, scaling it up for bigger games. A claim slot
+// names a `role` (that exact role) or a `faction` (any member of it). The player never learns whether a claim is right
+// until the organiser has reviewed it, otherwise trying names one by one would reveal who holds which role.
 export const winOf = (roleKey) => NARRATIVE_ROLES[roleKey]?.win || null;
 
-// Why a role's win condition can't be completed with this crew, or null if it can. `people` is a list of user docs with ids.
-export function unachievableWin(roleKey, people, selfId) {
+export const LARGE_CREW = 12;       // players with roles from which the bigger versions of some wins unlock
+export const FACTION_SHARE = 0.5;   // a faction win asks for this share of that faction's members...
+export const FACTION_CAP = 5;       // ...but never more than this many people (and never fewer than the role's own minimum)
+export const BOARD_CAP = 6;         // the board win never asks for more than this many correct in one check
+export const MAX_CLAIM_ATTEMPTS = 3;
+
+const peopleOf = (users) => Object.entries(users || {}).map(([id, u]) => ({ ...u, id }));
+export const crewSize = (people) => (people || []).filter(p => NARRATIVE_ROLES[p?.narrativeRole]).length;
+const fillText = (template, n) => String(template).replace(/\{n\}/g, n).replace(/\{s\}/g, n === 1 ? "" : "s");
+
+// How many correct guesses in one check meet the board win: a share of the crew, capped so a big game stays winnable.
+export function boardRequired(total, minShare) {
+  if (!(total > 0)) return 0;
+  return Math.max(1, Math.min(Math.ceil(minShare * total), BOARD_CAP));
+}
+
+// How many crew members must have a guess before the board can be checked: everyone in a small game, half in a big one
+// (anyone left unmarked simply counts as wrong).
+export function minMarkedToCheck(total) { return total <= 8 ? total : Math.ceil(total / 2); }
+
+// The concrete win for one player in this crew. `people` is a list of user docs with ids. Faction slots grow with the
+// number of players in that faction, and slots with `minCrew` only appear once the game is big enough.
+export function resolveWin(roleKey, people, selfId) {
   const win = winOf(roleKey);
+  if (!win) return null;
+  const others = (people || []).filter(p => p.id !== selfId);
+  if (win.type === "board") {
+    const required = boardRequired(others.length, win.minShare);
+    return { type: "board", text: fillText(win.text, required), required, slots: [] };
+  }
+  const size = crewSize(people);
+  const holders = others.filter(p => NARRATIVE_ROLES[p.narrativeRole]);
+  const slots = [];
+  const extras = [];
+  let scaled = null;
+  for (const t of win.slots) {
+    if (t.minCrew && size < t.minCrew) continue;
+    if (t.role) {
+      slots.push({ role: t.role, label: t.label });
+    } else {
+      const members = holders.filter(p => NARRATIVE_ROLES[p.narrativeRole].faction === t.faction).length;
+      // a part that only unlocks in a big game is a fixed extra person; the main faction part is the one that grows
+      const count = t.minCrew ? (t.count || 1) : Math.max(t.count || 1, Math.min(Math.ceil((t.share ?? FACTION_SHARE) * members), FACTION_CAP));
+      if (scaled === null && !t.minCrew) scaled = count;
+      for (let i = 1; i <= count; i++) slots.push({ faction: t.faction, label: count > 1 ? `${t.label} ${i}` : t.label });
+    }
+    if (t.minCrew && t.addText) extras.push(t.addText);
+  }
+  return { type: win.type, text: fillText(win.text, scaled ?? 1) + extras.join(""), proofHint: win.proofHint, slots };
+}
+
+// Why a role's win condition can't be completed with this crew, or null if it can.
+export function unachievableWin(roleKey, people, selfId) {
+  const win = resolveWin(roleKey, people, selfId);
   if (!win || win.type === "board") return null;
   const others = (people || []).filter(p => p.id !== selfId);
   const needed = {};
   for (const sl of win.slots) {
     if (sl.role) {
       if (!others.some(p => p.narrativeRole === sl.role)) return `no ${NARRATIVE_ROLES[sl.role].title} is assigned`;
-    } else if (sl.faction) needed[sl.faction] = (needed[sl.faction] || 0) + 1;
+    } else needed[sl.faction] = (needed[sl.faction] || 0) + 1;
   }
   for (const [f, n] of Object.entries(needed)) {
     const have = others.filter(p => NARRATIVE_ROLES[p.narrativeRole]?.faction === f).length;
@@ -632,10 +683,11 @@ export function unachievableWin(roleKey, people, selfId) {
   return null;
 }
 
-// Checks a claim's picks (one player id per slot, in order) against the roles actually assigned.
-export function evaluateClaim(roleKey, picks, users, selfUid) {
-  const slots = winOf(roleKey)?.slots || [];
-  const results = slots.map((sl, i) => {
+// Checks a claim's picks (one player id per slot, in order) against the roles actually assigned. `slots` is the claim's own
+// snapshot of what was asked; without one it is worked out from the crew as it is now.
+export function evaluateClaim(roleKey, picks, users, selfUid, slots) {
+  const list = slots?.length ? slots : resolveWin(roleKey, peopleOf(users), selfUid)?.slots || [];
+  const results = list.map((sl, i) => {
     const id = picks?.[i];
     const u = id ? users?.[id] : null;
     if (!u || id === selfUid) return false;
@@ -644,15 +696,16 @@ export function evaluateClaim(roleKey, picks, users, selfUid) {
     if (sl.faction) return NARRATIVE_ROLES[u.narrativeRole]?.faction === sl.faction;
     return false;
   });
-  return { slots: results, ok: slots.length > 0 && results.every(Boolean) };
+  return { slots: results, ok: list.length > 0 && results.every(Boolean) };
 }
 
-export function buildClaim({ id, claimantId, roleKey, picks, note, now = Date.now() }) {
-  return { id, claimantId, roleKey, picks: [...picks], note: (note || "").trim().slice(0, 300), status: "pending", createdAt: now };
+export function buildClaim({ id, claimantId, roleKey, picks, note, slots, winText, now = Date.now() }) {
+  return { id, claimantId, roleKey, picks: [...picks], slots: slots || [], winText: winText || "", note: (note || "").trim().slice(0, 300), status: "pending", createdAt: now };
 }
 
-export function reviewedClaim(claim, decision, note, reviewerId, now = Date.now()) {
-  return { ...claim, status: decision, reviewNote: (note || "").trim().slice(0, 300), reviewedBy: reviewerId, reviewedAt: now };
+// `uncounted` returns the attempt a rejected claim used (for example when the photo was unclear).
+export function reviewedClaim(claim, decision, note, reviewerId, now = Date.now(), uncounted = false) {
+  return { ...claim, status: decision, reviewNote: (note || "").trim().slice(0, 300), reviewedBy: reviewerId, reviewedAt: now, ...(decision === "rejected" && uncounted ? { uncounted: true } : {}) };
 }
 
 // Where a player stands on their mission, from the shared list of claims.
@@ -666,11 +719,18 @@ export function missionStatus(uid, claims) {
   return rejected ? { state: "rejected", claim: rejected } : { state: "none", claim: null };
 }
 
-// "board" missions are met automatically once the player's best check reaches the required share.
+// Claims a player has made, other than rejected ones the organiser gave back.
+export function attemptsUsed(uid, claims) {
+  return Object.values(claims || {}).filter(c => c && c.claimantId === uid && !c.uncounted).length;
+}
+export const attemptsLeft = (uid, claims) => Math.max(0, MAX_CLAIM_ATTEMPTS - attemptsUsed(uid, claims));
+
+// "board" missions are met automatically once any of the player's checks reaches the required number correct.
 export function boardMissionMet(roleKey, score) {
   const win = winOf(roleKey);
-  if (win?.type !== "board" || !score || !(score.bestTotal > 0)) return false;
-  return score.bestCorrect / score.bestTotal >= win.minShare;
+  if (win?.type !== "board" || !score) return false;
+  const checks = [{ correct: score.bestCorrect, total: score.bestTotal }, ...(Array.isArray(score.history) ? score.history : [])];
+  return checks.some(c => c && c.total > 0 && c.correct <= c.total && c.correct >= boardRequired(c.total, win.minShare));
 }
 
 // How many missions are complete across the crew. A count only: naming who would hint at who holds a role.
@@ -703,9 +763,10 @@ export async function prepareProofPhoto(file, compress = compressImage) {
 }
 
 // Saves a claim. The photo goes in its own document (loaded only when someone opens it, so the shared claim list stays
-// small) and is written first, so a reviewer never sees a claim without its photo.
+// small) and is written first, so a reviewer never sees a claim without its photo. The claim keeps a snapshot of what was
+// asked of the player, so reviewing it doesn't change if the crew does.
 export async function submitMissionClaim({ claimantId, roleKey, picks, note, photo, users, claims }) {
-  const win = winOf(roleKey);
+  const win = resolveWin(roleKey, peopleOf(users), claimantId);
   if (!win || win.type === "board") throw new Error("Your mission doesn't use claims.");
   if (!photo) throw new Error("Add a proof photo first.");
   if (!Array.isArray(picks) || picks.length !== win.slots.length || picks.some(p => !p) || new Set(picks).size !== picks.length || picks.includes(claimantId)) {
@@ -715,23 +776,30 @@ export async function submitMissionClaim({ claimantId, roleKey, picks, note, pho
   const { state } = missionStatus(claimantId, claims);
   if (state === "approved") throw new Error("Your mission is already complete.");
   if (state === "pending") throw new Error("You already have a claim waiting for review.");
+  if (attemptsUsed(claimantId, claims) >= MAX_CLAIM_ATTEMPTS) throw new Error(`You've used all ${MAX_CLAIM_ATTEMPTS} of your attempts.`);
   const id = uid();
-  const claim = buildClaim({ id, claimantId, roleKey, picks, note });
+  const claim = buildClaim({ id, claimantId, roleKey, picks, note, slots: win.slots, winText: win.text });
   await fsSet("missionProofs", id, { id, claimantId, photo });
   await fsSet("missionClaims", id, claim);
   return claim;
 }
 
 // Approves or rejects a pending claim. An approval is refused unless the claim matches the assigned roles.
-export async function reviewMissionClaim({ claim, decision, note, reviewerId, users }) {
+export async function reviewMissionClaim({ claim, decision, note, reviewerId, users, uncounted = false }) {
   if (decision !== "approved" && decision !== "rejected") throw new Error("Choose approve or reject.");
   if (claim?.status !== "pending") throw new Error("This claim has already been reviewed.");
-  if (decision === "approved" && !evaluateClaim(claim.roleKey, claim.picks, users, claim.claimantId).ok) {
+  if (decision === "approved" && !evaluateClaim(claim.roleKey, claim.picks, users, claim.claimantId, claim.slots).ok) {
     throw new Error("This claim doesn't match the assigned roles, so it can't be approved.");
   }
-  const next = reviewedClaim(claim, decision, note, reviewerId);
+  const next = reviewedClaim(claim, decision, note, reviewerId, Date.now(), uncounted);
   await fsSet("missionClaims", claim.id, next);
   return next;
+}
+
+// Gives a player back the attempt a rejected claim used.
+export async function forgiveClaimAttempt(claim) {
+  if (claim?.status !== "rejected") throw new Error("Only a rejected claim can be given back.");
+  await fsSet("missionClaims", claim.id, { uncounted: true });
 }
 
 const GAME_CATS = ["Light","Medium","Heavy","Party","2 Player"];
@@ -1307,7 +1375,7 @@ export function OnboardingModal({ctx}){
       icon:"📁",
       title:"Your Dossier",
       subtitle:"A classified mission — eyes only",
-      body:"Crew members may be handed a secret role. If you are one of them, your sealed dossier waits at the top of your Personal Log. Tap it to read your cover story, objectives and orders, and make sure no one is looking over your shoulder. It also holds your win condition: claim it with a photo as proof.",
+      body:"Crew members may be handed a secret role. If you are one of them, your sealed dossier waits at the top of your Personal Log. Tap it to read your cover story, objectives and orders, and make sure no one is looking over your shoulder. It also holds your win condition: claim it with a photo as proof. You get 3 attempts.",
       note:"Never show your dossier to anyone. Not even a friend. Especially not a friend.",
       color:"#F87171",
     },
@@ -1315,7 +1383,7 @@ export function OnboardingModal({ctx}){
       icon:"🗂️",
       title:"Crew Suspect Board",
       subtitle:"Trust no one",
-      body:"Inside your dossier, mark who you think holds which role for every other crew member. Once everyone is marked, tap Check my guesses to see how many you got right. Better scores with fewer checks climb the leaderboard.",
+      body:"Inside your dossier, mark who you think holds which role for every other crew member. Once enough of the crew is marked, tap Check my guesses to see how many you got right. Better scores with fewer checks climb the leaderboard.",
       note:"Your guesses stay private on your device. The leaderboard shows scores only, never who guessed what.",
       color:T.steam,
     },
@@ -2034,12 +2102,18 @@ export default function App(){
   };
 
   // Engine Room: approve or reject a claim
-  const doReviewMissionClaim = async (claim, decision, note) => {
+  const doReviewMissionClaim = async (claim, decision, note, uncounted) => {
     try{
-      await reviewMissionClaim({claim, decision, note, reviewerId:authUser.uid, users});
+      await reviewMissionClaim({claim, decision, note, reviewerId:authUser.uid, users, uncounted});
       showToast(decision==="approved"?"✓ Claim approved":"Claim rejected");
       return true;
     }catch(e){ showToast(`⚠️ ${e.message||"Couldn't save that decision."}`); return false; }
+  };
+
+  // Engine Room: give a player back the attempt a rejected claim used
+  const doForgiveClaimAttempt = async (claim) => {
+    try{ await forgiveClaimAttempt(claim); showToast("Attempt given back."); return true; }
+    catch(e){ showToast(`⚠️ ${e.message||"Couldn't give that attempt back."}`); return false; }
   };
 
   // Engine Room: replay the welcome tour for everyone
@@ -2074,7 +2148,7 @@ export default function App(){
     doSaveFood,doDelFood,doSaveSupply,doDelSupply,
     doSaveMenuItem,doDelMenuItem,doClaimSlot,doUnclaimSlot,doInitDeckHands,
     doSaveReceipt,doDelReceipt,
-    doSaveItinDay,doDelItinDay,doSaveDeckSlot,doDelDeckSlot,doSetDeposit,doSetRank,doSendNotification,doSaveCostSettings,costSettings,doSaveItinMeta,itinMeta,doAssignNarrativeRole,suspectScores,doRecordSuspectCheck,missionClaims,doSubmitMissionClaim,doReviewMissionClaim,doResetOnboarding,
+    doSaveItinDay,doDelItinDay,doSaveDeckSlot,doDelDeckSlot,doSetDeposit,doSetRank,doSendNotification,doSaveCostSettings,costSettings,doSaveItinMeta,itinMeta,doAssignNarrativeRole,suspectScores,doRecordSuspectCheck,missionClaims,doSubmitMissionClaim,doReviewMissionClaim,doForgiveClaimAttempt,doResetOnboarding,
     notifPerm,notifSupported,requestPermission};
 
   return <>
@@ -4615,15 +4689,17 @@ export async function fetchProofPhoto(claimId) {
 
 const claimWhen = ts => ts ? new Date(ts).toLocaleString("en-CA",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "";
 
-function ClaimRow({claim,users,onReview}){
+function ClaimRow({claim,users,attempt,onReview}){
   const claimant=users?.[claim.claimantId];
   const role=NARRATIVE_ROLES[claim.roleKey];
   const fac=role?NARRATIVE_FACTIONS[role.faction]:null;
-  const slots=winOf(claim.roleKey)?.slots||[];
-  const check=evaluateClaim(claim.roleKey,claim.picks,users,claim.claimantId);
+  const current=resolveWin(claim.roleKey,peopleOf(users),claim.claimantId);
+  const slots=claim.slots?.length?claim.slots:(current?.slots||[]);
+  const check=evaluateClaim(claim.roleKey,claim.picks,users,claim.claimantId,claim.slots);
   const [photo,setPhoto]=useState(undefined); // undefined: not fetched yet, null: none found, string: the image
   const [loading,setLoading]=useState(false);
   const [note,setNote]=useState("");
+  const [uncounted,setUncounted]=useState(false);
   const [busy,setBusy]=useState(false);
 
   const showPhoto=async()=>{
@@ -4631,7 +4707,7 @@ function ClaimRow({claim,users,onReview}){
     try{ setPhoto(await fetchProofPhoto(claim.id)); }catch{ setPhoto(null); }
     setLoading(false);
   };
-  const decide=async d=>{ setBusy(true); await onReview(claim,d,note); setBusy(false); };
+  const decide=async d=>{ setBusy(true); await onReview(claim,d,note,uncounted); setBusy(false); };
   const small={fontSize:11,color:T.hint};
 
   return <div style={{background:T.bgMid,border:`1.5px solid ${fac?.border||T.border2}`,borderRadius:7,padding:"12px 14px"}}>
@@ -4641,10 +4717,13 @@ function ClaimRow({claim,users,onReview}){
         <div style={{fontFamily:"'Cinzel',serif",fontSize:13,fontWeight:700,color:T.text}}>{claimant?.name||"Former crew member"}</div>
         <div style={{fontSize:11,color:fac?.color||T.muted}}>{role?`${role.icon} ${role.title}`:"No role"}</div>
       </div>
-      <div style={small}>{claimWhen(claim.createdAt)}</div>
+      <div style={{textAlign:"right"}}>
+        <div style={small}>{claimWhen(claim.createdAt)}</div>
+        <div style={{...small,color:attempt>=MAX_CLAIM_ATTEMPTS?T.danger:T.hint}}>Attempt {attempt} of {MAX_CLAIM_ATTEMPTS}</div>
+      </div>
     </div>
 
-    <div style={{fontSize:12,color:T.muted,marginBottom:8,fontStyle:"italic"}}>{winOf(claim.roleKey)?.text}</div>
+    <div style={{fontSize:12,color:T.muted,marginBottom:8,fontStyle:"italic"}}>{claim.winText||current?.text}</div>
 
     <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:8}}>
       {slots.map((sl,i)=>{
@@ -4679,11 +4758,15 @@ function ClaimRow({claim,users,onReview}){
       <Btn size="sm" disabled={!check.ok||busy||photo===null} onClick={()=>decide("approved")}>✓ Approve</Btn>
       <Btn size="sm" variant="danger" disabled={busy} onClick={()=>decide("rejected")}>✗ Reject</Btn>
     </div>
+    <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:T.hint,marginTop:8,cursor:"pointer"}}>
+      <input type="checkbox" checked={uncounted} onChange={e=>setUncounted(e.target.checked)}/>
+      If rejected, don't count it as one of their {MAX_CLAIM_ATTEMPTS} attempts (for example, an unclear photo)
+    </label>
   </div>;
 }
 
 export function ClaimsReview({ctx}){
-  const {users,missionClaims,doReviewMissionClaim}=ctx;
+  const {users,missionClaims,doReviewMissionClaim,doForgiveClaimAttempt}=ctx;
   const all=Object.values(missionClaims||{}).filter(Boolean);
   const pending=all.filter(c=>c.status==="pending").sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
   const reviewed=all.filter(c=>c.status!=="pending").sort((a,b)=>(b.reviewedAt||0)-(a.reviewedAt||0));
@@ -4692,8 +4775,8 @@ export function ClaimsReview({ctx}){
   return <div>
     <h3 style={{fontFamily:"'Cinzel',serif",fontSize:14,color:T.amber,margin:"0 0 10px"}}>📸 Mission Claims</h3>
     <p style={{fontSize:12,color:T.muted,marginBottom:16,lineHeight:1.6}}>
-      Players claim their win condition with a photo as proof. Check the photo, then approve or reject. A claim that doesn't match
-      the assigned roles can't be approved. Players are only told the outcome, never which part was wrong.
+      Players claim their win condition with a photo as proof, and get {MAX_CLAIM_ATTEMPTS} attempts each. Check the photo, then approve or
+      reject. A claim that doesn't match the assigned roles can't be approved. Players are only told the outcome, never which part was wrong.
       {done>0&&` ${done} mission${done===1?"":"s"} complete so far.`}
     </p>
 
@@ -4703,7 +4786,7 @@ export function ClaimsReview({ctx}){
     {pending.length===0
       ?<p style={{fontSize:12,color:T.hint,fontStyle:"italic",margin:"0 0 18px"}}>No claims waiting.</p>
       :<div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
-        {pending.map(c=><ClaimRow key={c.id} claim={c} users={users} onReview={doReviewMissionClaim}/>)}
+        {pending.map(c=><ClaimRow key={c.id} claim={c} users={users} attempt={attemptsUsed(c.claimantId,missionClaims)} onReview={doReviewMissionClaim}/>)}
       </div>}
 
     {reviewed.length>0&&<>
@@ -4717,6 +4800,11 @@ export function ClaimsReview({ctx}){
             <span style={{fontSize:12,fontWeight:700,color:ok?"#4ADE80":T.danger}}>{ok?"✓ Approved":"✗ Rejected"}</span>
             <span style={{flex:1,minWidth:100,fontSize:12,color:T.text}}>{users?.[c.claimantId]?.name||"Former crew member"}</span>
             {c.reviewNote&&<span style={{fontSize:11,color:T.muted,fontStyle:"italic"}}>"{c.reviewNote}"</span>}
+            {c.uncounted&&<span style={{fontSize:11,color:T.hint}}>(attempt returned)</span>}
+            {c.status==="rejected"&&!c.uncounted&&doForgiveClaimAttempt&&<button type="button" onClick={()=>doForgiveClaimAttempt(c)}
+              style={{fontFamily:"inherit",fontSize:11,padding:"3px 8px",borderRadius:4,cursor:"pointer",border:`1px solid ${T.border2}`,background:T.surface2,color:T.text}}>
+              Give attempt back
+            </button>}
             <span style={{fontSize:11,color:T.hint}}>{claimWhen(c.reviewedAt)}</span>
           </div>;
         })}
@@ -4969,7 +5057,8 @@ export function RoleGuessBoard({uid,users,allScores,onRecordCheck}){
   const roles=Object.entries(NARRATIVE_ROLES);
   const guessFor=id=>NARRATIVE_ROLES[guesses[id]]||guesses[id]===NOT_PLAYING?guesses[id]:"";
   const marked=crew.filter(c=>guessFor(c.id)).length;
-  const allMarked=crew.length>0&&marked===crew.length;
+  const needMarked=minMarkedToCheck(crew.length);
+  const canCheck=crew.length>0&&marked>=needMarked;
   const history=Array.isArray(myScore?.history)?myScore.history.filter(isCheckResult):[];
   const checksMade=Number.isInteger(myScore?.checks)&&myScore.checks>=history.length?myScore.checks:history.length;
   const last=history.at(-1);
@@ -4981,7 +5070,7 @@ export function RoleGuessBoard({uid,users,allScores,onRecordCheck}){
     setGuesses(next);
   };
   const runCheck=()=>{
-    if(!allMarked) return;
+    if(!canCheck) return;
     const valid=Object.fromEntries(crew.map(c=>[c.id,guessFor(c.id)]));
     onRecordCheck?.(scoreGuesses(valid,users,uid));
   };
@@ -5026,11 +5115,13 @@ export function RoleGuessBoard({uid,users,allScores,onRecordCheck}){
       </div>}
 
     {crew.length>0&&<div style={{marginTop:14}}>
-      <Btn onClick={runCheck} disabled={!allMarked} style={{width:"100%"}}>
+      <Btn onClick={runCheck} disabled={!canCheck} style={{width:"100%"}}>
         <i className="ti ti-checks"/> Check my guesses
       </Btn>
-      {!allMarked&&<div style={{fontSize:11,color:T.hint,marginTop:6,textAlign:"center"}}>
-        Mark all {crew.length} crew members to unlock the check — {crew.length-marked} to go.
+      {!canCheck&&<div style={{fontSize:11,color:T.hint,marginTop:6,textAlign:"center"}}>
+        {needMarked===crew.length
+          ?`Mark all ${crew.length} crew members to unlock the check — ${crew.length-marked} to go.`
+          :`Mark at least ${needMarked} of ${crew.length} crew members to unlock the check — ${needMarked-marked} to go. Anyone left unmarked counts as wrong.`}
       </div>}
       {last&&<div role="status" style={{marginTop:10,padding:"10px 14px",borderRadius:6,textAlign:"center",
         border:`1.5px solid ${perfect?"#166534":T.amber}`,background:perfect?"#162A1E":T.bgMid,
@@ -5083,7 +5174,7 @@ function ProofPhotoPicker({photo,onPhoto,compress,hint}){
 
 // ── Mission card (win condition + claim with photo proof) ─────────────────────
 export function MissionCard({roleKey,uid,users,claims,scores,onSubmit,compress,fac}){
-  const win=winOf(roleKey);
+  const win=resolveWin(roleKey,peopleOf(users),uid);
   const [picks,setPicks]=useState([]);
   const [note,setNote]=useState("");
   const [photo,setPhoto]=useState("");
@@ -5096,7 +5187,8 @@ export function MissionCard({roleKey,uid,users,claims,scores,onSubmit,compress,f
     .sort((a,b)=>(a.name||"").localeCompare(b.name||""));
   const done=completedMissionCount(users,claims,scores);
   const status=missionStatus(uid,claims);
-  const slots=win.slots||[];
+  const left=attemptsLeft(uid,claims);
+  const slots=win.slots;
   const complete=slots.length>0&&picks.length===slots.length&&picks.every(Boolean)&&new Set(picks).size===picks.length;
   const canSend=complete&&!!photo&&!busy;
 
@@ -5114,12 +5206,11 @@ export function MissionCard({roleKey,uid,users,claims,scores,onSubmit,compress,f
   let body;
   if(win.type==="board"){
     const sc=scores?.[uid];
-    const share=sc&&sc.bestTotal>0?Math.round(100*sc.bestCorrect/sc.bestTotal):null;
     const met=boardMissionMet(roleKey,sc);
     body=<>
       <div style={{fontSize:12,color:T.muted,lineHeight:1.6}}>
-        Judged automatically from your best Crew Suspect Board check. You need {Math.round(100*win.minShare)}% or better.
-        {share===null?" You haven't checked your guesses yet.":` Your best so far is ${share}%.`}
+        Judged automatically from your Crew Suspect Board checks: get {win.required} or more correct in a single check.
+        {sc&&sc.bestTotal>0?` Your best check so far is ${sc.bestCorrect} of ${sc.bestTotal}.`:" You haven't checked your guesses yet."}
       </div>
       {met&&banner("🎉 Mission accomplished!","#4ADE80","#162A1E","#166534")}
     </>;
@@ -5134,33 +5225,43 @@ export function MissionCard({roleKey,uid,users,claims,scores,onSubmit,compress,f
     body=<>
       {status.state==="rejected"&&<div role="status" style={{marginBottom:12,padding:"9px 12px",borderRadius:6,fontSize:12,lineHeight:1.5,
         color:T.danger,background:T.dangerBg,border:`1px solid ${T.danger}44`}}>
-        Your last claim wasn't approved.{status.claim.reviewNote?` Organiser's note: ${status.claim.reviewNote}`:""} You can send a new one.
+        Your last claim wasn't approved.{status.claim.reviewNote?` Organiser's note: ${status.claim.reviewNote}`:""}{left>0?" You can send a new one.":""}
       </div>}
-      <div style={{fontSize:12,color:T.muted,marginBottom:12,lineHeight:1.6}}>
-        Claim it with a photo as proof. The organiser reviews every claim, so you won't be told straight away whether you picked the right people.
-      </div>
-      <div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {slots.map((sl,i)=>(
-          <div key={i}>
-            <label style={{display:"block",fontSize:11,fontWeight:600,color:T.muted,textTransform:"uppercase",letterSpacing:".06em",marginBottom:4}}>{sl.label}</label>
-            <select aria-label={sl.label} value={picks[i]||""} onChange={e=>setPick(i,e.target.value)}
-              style={{width:"100%",fontFamily:"inherit",fontSize:13,padding:"8px 10px",borderRadius:5,background:T.surface2,color:T.text,border:`1.5px solid ${T.border2}`}}>
-              <option value="">— Choose a crew member —</option>
-              {crew.map(c=><option key={c.id} value={c.id} disabled={picks.includes(c.id)&&picks[i]!==c.id}>{c.name||"Crew member"}</option>)}
-            </select>
-          </div>
-        ))}
-        <div>
-          <label style={{display:"block",fontSize:11,fontWeight:600,color:T.muted,textTransform:"uppercase",letterSpacing:".06em",marginBottom:4}}>Where and when? (optional)</label>
-          <input aria-label="Where and when" value={note} maxLength={300} onChange={e=>setNote(e.target.value)} placeholder="e.g. by the fire, Friday night"
-            style={{width:"100%",boxSizing:"border-box",fontFamily:"inherit",fontSize:13,padding:"8px 10px",borderRadius:5,background:T.surface2,color:T.text,border:`1.5px solid ${T.border2}`}}/>
+      {left===0
+        ?<div role="status" style={{padding:"10px 14px",borderRadius:6,fontSize:12,lineHeight:1.5,textAlign:"center",
+          color:T.danger,background:T.dangerBg,border:`1px solid ${T.danger}44`}}>
+          You've used all {MAX_CLAIM_ATTEMPTS} of your attempts. If you think a claim was turned down unfairly, ask the organiser.
         </div>
-        <ProofPhotoPicker photo={photo} onPhoto={setPhoto} compress={compress} hint={win.proofHint}/>
-        <Btn onClick={send} disabled={!canSend} style={{width:"100%"}}>{busy?"Sending…":"📸 Send claim for review"}</Btn>
-        {!canSend&&!busy&&<div style={{fontSize:11,color:T.hint,textAlign:"center"}}>
-          {!complete?"Choose a different crew member for each part.":"Add a proof photo to send your claim."}
-        </div>}
-      </div>
+        :<>
+          <div style={{fontSize:12,color:T.muted,marginBottom:6,lineHeight:1.6}}>
+            Claim it with a photo as proof. The organiser reviews every claim, so you won't be told straight away whether you picked the right people.
+          </div>
+          <div style={{fontSize:11,fontWeight:700,color:left===1?T.danger:T.amber,marginBottom:12,fontFamily:"'Cinzel',serif",letterSpacing:".04em"}}>
+            Attempts left: {left} of {MAX_CLAIM_ATTEMPTS}
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {slots.map((sl,i)=>(
+              <div key={i}>
+                <label style={{display:"block",fontSize:11,fontWeight:600,color:T.muted,textTransform:"uppercase",letterSpacing:".06em",marginBottom:4}}>{sl.label}</label>
+                <select aria-label={sl.label} value={picks[i]||""} onChange={e=>setPick(i,e.target.value)}
+                  style={{width:"100%",fontFamily:"inherit",fontSize:13,padding:"8px 10px",borderRadius:5,background:T.surface2,color:T.text,border:`1.5px solid ${T.border2}`}}>
+                  <option value="">— Choose a crew member —</option>
+                  {crew.map(c=><option key={c.id} value={c.id} disabled={picks.includes(c.id)&&picks[i]!==c.id}>{c.name||"Crew member"}</option>)}
+                </select>
+              </div>
+            ))}
+            <div>
+              <label style={{display:"block",fontSize:11,fontWeight:600,color:T.muted,textTransform:"uppercase",letterSpacing:".06em",marginBottom:4}}>Where and when? (optional)</label>
+              <input aria-label="Where and when" value={note} maxLength={300} onChange={e=>setNote(e.target.value)} placeholder="e.g. by the fire, Friday night"
+                style={{width:"100%",boxSizing:"border-box",fontFamily:"inherit",fontSize:13,padding:"8px 10px",borderRadius:5,background:T.surface2,color:T.text,border:`1.5px solid ${T.border2}`}}/>
+            </div>
+            <ProofPhotoPicker photo={photo} onPhoto={setPhoto} compress={compress} hint={win.proofHint}/>
+            <Btn onClick={send} disabled={!canSend} style={{width:"100%"}}>{busy?"Sending…":"📸 Send claim for review"}</Btn>
+            {!canSend&&!busy&&<div style={{fontSize:11,color:T.hint,textAlign:"center"}}>
+              {!complete?"Choose a different crew member for each part.":"Add a proof photo to send your claim."}
+            </div>}
+          </div>
+        </>}
     </>;
   }
 

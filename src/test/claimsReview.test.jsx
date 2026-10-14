@@ -113,7 +113,7 @@ describe('ClaimsReview', () => {
     await user.type(screen.getByLabelText('Note to the player'), 'Lovely photo')
     await user.click(screen.getByRole('button', { name: /approve/i }))
     expect(ctx.doReviewMissionClaim).toHaveBeenCalledTimes(1)
-    expect(ctx.doReviewMissionClaim).toHaveBeenCalledWith(expect.objectContaining({ id: 'c1' }), 'approved', 'Lovely photo')
+    expect(ctx.doReviewMissionClaim).toHaveBeenCalledWith(expect.objectContaining({ id: 'c1' }), 'approved', 'Lovely photo', false)
   })
 
   it('rejects a claim, even a matching one, with a reason', async () => {
@@ -121,7 +121,7 @@ describe('ClaimsReview', () => {
     const ctx = setup({ c1: claim() })
     await user.type(screen.getByLabelText('Note to the player'), 'Too blurry')
     await user.click(screen.getByRole('button', { name: /reject/i }))
-    expect(ctx.doReviewMissionClaim).toHaveBeenCalledWith(expect.objectContaining({ id: 'c1' }), 'rejected', 'Too blurry')
+    expect(ctx.doReviewMissionClaim).toHaveBeenCalledWith(expect.objectContaining({ id: 'c1' }), 'rejected', 'Too blurry', false)
   })
 
   it('lists the oldest claim first', () => {

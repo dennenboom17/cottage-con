@@ -53,7 +53,8 @@ describe('win conditions: data', () => {
   it('has the Rebel arms buyer meet the Freelance Arms Dealer', () => {
     const w = winOf('rebel_arms_buyer')
     expect(w.type).toBe('meet')
-    expect(w.slots).toEqual([expect.objectContaining({ role: 'arms_dealer' })])
+    expect(w.slots[0]).toEqual(expect.objectContaining({ role: 'arms_dealer' }))
+    expect(w.slots[1]).toEqual(expect.objectContaining({ faction: 'rebellion', minCrew: 12 })) // a witness, in a big game
   })
 
   it('has the Imperial investigator identify both the dealer and the Rebel buyer', () => {

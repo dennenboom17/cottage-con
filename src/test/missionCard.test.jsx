@@ -168,8 +168,8 @@ describe('MissionCard: a board mission', () => {
 
   it('is judged automatically, so there is no claim form', () => {
     setup(broker)
-    expect(screen.getByText('Reach 60% correct on the Crew Suspect Board.')).toBeInTheDocument()
-    expect(screen.getByText(/You need 60% or better/)).toBeInTheDocument()
+    expect(screen.getByText('Reach 3 correct on the Crew Suspect Board.')).toBeInTheDocument() // 4 other crew: 60% rounds up to 3
+    expect(screen.getByText(/get 3 or more correct in a single check/)).toBeInTheDocument()
     expect(screen.getByText(/haven't checked your guesses yet/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /send claim/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
@@ -177,7 +177,7 @@ describe('MissionCard: a board mission', () => {
 
   it('shows progress, and celebrates once the best check is good enough', () => {
     const { unmount } = setup({ ...broker, scores: { b: { bestCorrect: 2, bestTotal: 5 } } })
-    expect(screen.getByText(/Your best so far is 40%/)).toBeInTheDocument()
+    expect(screen.getByText(/Your best check so far is 2 of 5/)).toBeInTheDocument()
     expect(screen.queryByText(/Mission accomplished/)).not.toBeInTheDocument()
     unmount()
     setup({ ...broker, scores: { b: { bestCorrect: 4, bestTotal: 5 } } })
