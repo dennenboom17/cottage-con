@@ -19,7 +19,7 @@ const times = (n, role) => Array.from({ length: n }, () => role)
 const seeded = (seed) => () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296 }
 
 describe('faction wins grow with the faction, up to a cap', () => {
-  // player p0 is an Imperial Security Director (base 2, 50% of the Rebellion, cap 5)
+  // player p0 is an Admiralty Constable-General (base 2, 50% of the Rebellion, cap 5)
   const securityVs = (rebels) => resolveWin('imperial_security', mk(['imperial_security', ...times(rebels, 'rebel_pilot')]).people, 'p0')
 
   it('asks for the role\'s own minimum in a small game', () => {
@@ -41,11 +41,11 @@ describe('faction wins grow with the faction, up to a cap', () => {
   })
 
   it('puts the number in the wording, and numbers the slots only when there is more than one', () => {
-    expect(securityVs(8).text).toBe('Identify 4 members of the Rebellion.')
-    expect(securityVs(8).slots.map(s => s.label)).toEqual(['Rebellion member 1', 'Rebellion member 2', 'Rebellion member 3', 'Rebellion member 4'])
+    expect(securityVs(8).text).toBe('Identify 4 members of the League.')
+    expect(securityVs(8).slots.map(s => s.label)).toEqual(['League member 1', 'League member 2', 'League member 3', 'League member 4'])
     const agent = resolveWin('imperial_agent', mk(['imperial_agent', 'rebel_pilot']).people, 'p0')
-    expect(agent.text).toBe('Expose 1 member of the Rebellion, with proof.')
-    expect(agent.slots.map(s => s.label)).toEqual(['Rebellion member'])
+    expect(agent.text).toBe('Expose 1 member of the League, with proof.')
+    expect(agent.slots.map(s => s.label)).toEqual(['League member'])
   })
 
   it('uses a lighter share for the roles that say so', () => {
@@ -53,8 +53,8 @@ describe('faction wins grow with the faction, up to a cap', () => {
     const pilot = (rebels) => resolveWin('rebel_pilot', mk(['rebel_pilot', ...times(rebels, 'rebel_commander')]).people, 'p0')
     expect(agent(8).slots).toHaveLength(3) // 30% of 8 = 2.4, rounds up
     expect(pilot(8).slots).toHaveLength(3)
-    expect(pilot(8).text).toBe('Meet 3 rebels in need of extraction.')
-    expect(pilot(1).text).toBe('Meet 1 rebel in need of extraction.')
+    expect(pilot(8).text).toBe('Meet 3 League members in need of extraction.')
+    expect(pilot(1).text).toBe('Meet 1 League member in need of extraction.')
     expect(securityVs(8).slots.length).toBeGreaterThan(agent(8).slots.length)
   })
 
@@ -67,15 +67,15 @@ describe('faction wins grow with the faction, up to a cap', () => {
 
   it('works for the Rebellion\'s identify win against the Empire', () => {
     const spy = (empire) => resolveWin('rebel_spy', mk(['rebel_spy', ...times(empire, 'imperial_agent')]).people, 'p0')
-    expect(spy(2).text).toBe('Identify 2 Imperial agents.')
-    expect(spy(8).text).toBe('Identify 4 Imperial agents.')
+    expect(spy(2).text).toBe('Identify 2 Admiralty agents.')
+    expect(spy(8).text).toBe('Identify 4 Admiralty agents.')
     expect(spy(8).slots.every(s => s.faction === 'empire')).toBe(true)
   })
 
   it('never asks for fewer people than a small game can supply: it stays at the minimum and is flagged as unachievable', () => {
     const crew = mk(['imperial_security', 'rebel_pilot'])
     expect(resolveWin('imperial_security', crew.people, 'p0').slots).toHaveLength(2)
-    expect(unachievableWin('imperial_security', crew.people, 'p0')).toBe('it needs 2 Rebellion members but only 1 is assigned')
+    expect(unachievableWin('imperial_security', crew.people, 'p0')).toBe('it needs 2 League members but only 1 is assigned')
   })
 
   it('is always completable when the faction is big enough, because it never asks for more than exists', () => {
@@ -97,15 +97,15 @@ describe('big games unlock bigger versions of some wins', () => {
     expect(resolveWin('rebel_arms_buyer', small.people, 'p0').slots).toHaveLength(1)
     const w = resolveWin('rebel_arms_buyer', big.people, 'p0')
     expect(w.slots).toHaveLength(2)
-    expect(w.slots[1]).toEqual({ faction: 'rebellion', label: 'A fellow rebel who witnessed the deal' })
-    expect(w.text).toBe('Meet the Freelance Arms Dealer and close the deal. In a big game, bring a fellow rebel along as a witness.')
+    expect(w.slots[1]).toEqual({ faction: 'rebellion', label: 'A fellow League member who witnessed the deal' })
+    expect(w.text).toBe('Meet the Freelance Gunsmith and close the deal. In a big game, bring a fellow League member along as a witness.')
   })
 
-  it('has the Customs Inspector name the Rebel buyer too, in a big game', () => {
+  it('has the Customs Inspector name the League buyer too, in a big game', () => {
     const big = mk(['imperial_smuggler_hunter', 'smuggler', 'rebel_black_market_agent', ...times(LARGE_CREW - 3, 'rebel_commander')])
     const w = resolveWin('imperial_smuggler_hunter', big.people, 'p0')
     expect(w.slots.map(s => s.role)).toEqual(['smuggler', 'rebel_black_market_agent'])
-    expect(w.text).toMatch(/also name the Rebel buying from them/)
+    expect(w.text).toMatch(/also name the League buyer who is purchasing from them/)
     const small = mk(['imperial_smuggler_hunter', 'smuggler', 'rebel_black_market_agent'])
     expect(resolveWin('imperial_smuggler_hunter', small.people, 'p0').slots).toHaveLength(1)
   })
@@ -287,7 +287,7 @@ describe('a claim keeps what was asked of the player', () => {
     const small = mk(['imperial_security', ...times(2, 'rebel_pilot')])
     const claim = await submitMissionClaim({ claimantId: 'p0', roleKey: 'imperial_security', picks: ['p1', 'p2'], photo: 'data:x', users: small.users, claims: {} })
     expect(claim.slots).toHaveLength(2)
-    expect(claim.winText).toBe('Identify 2 members of the Rebellion.')
+    expect(claim.winText).toBe('Identify 2 members of the League.')
 
     // ...the crew then grows, which would now ask for four, but the claim is still judged on what it was
     const grown = mk(['imperial_security', ...times(8, 'rebel_pilot')])
@@ -311,8 +311,8 @@ describe('MissionCard: scaling and attempts', () => {
 
   it('shows one picker for each person the bigger game asks for', () => {
     render1()
-    expect(screen.getByText('Identify 4 members of the Rebellion.')).toBeInTheDocument()
-    expect(screen.getAllByRole('combobox').map(c => c.getAttribute('aria-label'))).toEqual(['Rebellion member 1', 'Rebellion member 2', 'Rebellion member 3', 'Rebellion member 4'])
+    expect(screen.getByText('Identify 4 members of the League.')).toBeInTheDocument()
+    expect(screen.getAllByRole('combobox').map(c => c.getAttribute('aria-label'))).toEqual(['League member 1', 'League member 2', 'League member 3', 'League member 4'])
   })
 
   it('shows how many attempts are left', () => {
@@ -389,7 +389,7 @@ describe('Crew Suspect Board: checking with part of a big crew marked', () => {
 
 describe('Mission claims review: attempts', () => {
   const crew = mk(['rebel_arms_buyer', 'arms_dealer', 'smuggler'])
-  const claim = (over = {}) => ({ id: 'c1', claimantId: 'p0', roleKey: 'rebel_arms_buyer', picks: ['p1'], slots: [{ role: 'arms_dealer', label: 'The Freelance Arms Dealer' }], winText: 'Meet the Freelance Arms Dealer and close the deal.', note: '', status: 'pending', createdAt: 100, ...over })
+  const claim = (over = {}) => ({ id: 'c1', claimantId: 'p0', roleKey: 'rebel_arms_buyer', picks: ['p1'], slots: [{ role: 'arms_dealer', label: 'The Freelance Gunsmith' }], winText: 'Meet the Freelance Gunsmith and close the deal.', note: '', status: 'pending', createdAt: 100, ...over })
   const setup = (claims, over = {}) => {
     const ctx = { users: crew.users, missionClaims: claims, suspectScores: {}, doReviewMissionClaim: vi.fn().mockResolvedValue(true), doForgiveClaimAttempt: vi.fn().mockResolvedValue(true), ...over }
     render(<ClaimsReview ctx={ctx} />)
@@ -435,7 +435,7 @@ describe('Mission claims review: attempts', () => {
     const big = mk(['rebel_arms_buyer', 'arms_dealer', ...times(10, 'rebel_commander')]) // today a witness would also be asked for
     setup({ c1: claim() }, { users: big.users })
     expect(screen.getAllByTestId('claim-slot')).toHaveLength(1)
-    expect(screen.getByText('Meet the Freelance Arms Dealer and close the deal.')).toBeInTheDocument()
+    expect(screen.getByText('Meet the Freelance Gunsmith and close the deal.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /approve/i })).toBeEnabled()
   })
 })

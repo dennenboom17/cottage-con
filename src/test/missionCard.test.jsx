@@ -30,7 +30,7 @@ describe('MissionCard: the win condition', () => {
   it('shows what the player has to do', () => {
     setup()
     expect(screen.getByText(/Win Condition/)).toBeInTheDocument()
-    expect(screen.getByText('Meet the Freelance Arms Dealer and close the deal.')).toBeInTheDocument()
+    expect(screen.getByText('Meet the Freelance Gunsmith and close the deal.')).toBeInTheDocument()
   })
 
   it('shows nothing for a role with no mission', () => {
@@ -40,7 +40,7 @@ describe('MissionCard: the win condition', () => {
 
   it("offers every other crew member to pick, including someone with no role, but not the player", () => {
     setup()
-    const names = within(screen.getByLabelText('The Freelance Arms Dealer')).getAllByRole('option').map(o => o.textContent)
+    const names = within(screen.getByLabelText('The Freelance Gunsmith')).getAllByRole('option').map(o => o.textContent)
     expect(names).toEqual(['— Choose a crew member —', 'Dev', 'Nia', 'Sam'])
   })
 
@@ -61,7 +61,7 @@ describe('MissionCard: making a claim', () => {
     expect(sendBtn()).toBeDisabled()
     expect(screen.getByText('Choose a different crew member for each part.')).toBeInTheDocument()
 
-    await user.selectOptions(screen.getByLabelText('The Freelance Arms Dealer'), 'd')
+    await user.selectOptions(screen.getByLabelText('The Freelance Gunsmith'), 'd')
     expect(sendBtn()).toBeDisabled()
     expect(screen.getByText('Add a proof photo to send your claim.')).toBeInTheDocument()
 
@@ -91,30 +91,30 @@ describe('MissionCard: making a claim', () => {
   it('sends the picks, note and photo, then clears the form', async () => {
     const user = userEvent.setup()
     const { props } = setup()
-    await user.selectOptions(screen.getByLabelText('The Freelance Arms Dealer'), 'd')
+    await user.selectOptions(screen.getByLabelText('The Freelance Gunsmith'), 'd')
     await user.type(screen.getByLabelText('Where and when'), 'by the fire')
     await attach()
     await user.click(sendBtn())
     expect(props.onSubmit).toHaveBeenCalledWith({ picks: ['d'], note: 'by the fire', photo: PHOTO })
     await waitFor(() => expect(screen.queryByAltText('Proof preview')).not.toBeInTheDocument())
-    expect(screen.getByLabelText('The Freelance Arms Dealer')).toHaveValue('')
+    expect(screen.getByLabelText('The Freelance Gunsmith')).toHaveValue('')
   })
 
   it('keeps what the player entered if the claim could not be sent', async () => {
     const user = userEvent.setup()
     setup({ onSubmit: vi.fn().mockResolvedValue(false) })
-    await user.selectOptions(screen.getByLabelText('The Freelance Arms Dealer'), 'd')
+    await user.selectOptions(screen.getByLabelText('The Freelance Gunsmith'), 'd')
     await attach()
     await user.click(sendBtn())
     await waitFor(() => expect(sendBtn()).toBeEnabled())
-    expect(screen.getByLabelText('The Freelance Arms Dealer')).toHaveValue('d')
+    expect(screen.getByLabelText('The Freelance Gunsmith')).toHaveValue('d')
     expect(screen.getByAltText('Proof preview')).toBeInTheDocument()
   })
 
   it("never says whether the picks were right: that is the organiser's call", async () => {
     const user = userEvent.setup()
     setup()
-    await user.selectOptions(screen.getByLabelText('The Freelance Arms Dealer'), 's') // the wrong person
+    await user.selectOptions(screen.getByLabelText('The Freelance Gunsmith'), 's') // the wrong person
     await attach()
     await user.click(sendBtn())
     expect(screen.queryByText(/correct|wrong|incorrect|right person/i)).not.toBeInTheDocument()
@@ -124,7 +124,7 @@ describe('MissionCard: making a claim', () => {
   it('needs a different person for each part of a two-part mission', async () => {
     const user = userEvent.setup()
     setup({ roleKey: 'imperial_arms_hunter', uid: 'h', users: { ...users, h: { name: 'Hal', narrativeRole: 'imperial_arms_hunter' } }, fac: NARRATIVE_FACTIONS.empire })
-    expect(screen.getByText('Identify both the Freelance Arms Dealer and the Rebel buyer.')).toBeInTheDocument()
+    expect(screen.getByText('Identify both the Freelance Gunsmith and the League buyer.')).toBeInTheDocument()
     const [first, second] = pickers()
     await user.selectOptions(first, 'd')
     expect(within(second).getByRole('option', { name: 'Dev' })).toBeDisabled() // already named in the first part
@@ -201,8 +201,8 @@ describe('inside the unlocked dossier', () => {
 
   it("shows the player's own win condition and passes a claim up to the app", async () => {
     const { user, doSubmitMissionClaim } = await open()
-    expect(screen.getByText('Meet the Freelance Arms Dealer and close the deal.')).toBeInTheDocument()
-    await user.selectOptions(screen.getByLabelText('The Freelance Arms Dealer'), 'd')
+    expect(screen.getByText('Meet the Freelance Gunsmith and close the deal.')).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('The Freelance Gunsmith'), 'd')
     await attach()
     await user.click(sendBtn())
     expect(doSubmitMissionClaim).toHaveBeenCalledWith({ picks: ['d'], note: '', photo: PHOTO })

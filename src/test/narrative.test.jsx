@@ -20,10 +20,10 @@ describe('narrative data', () => {
 
   it('pairs each buyer and hunter role with the independent they target, on the right side', () => {
     const expected = {
-      rebel_arms_buyer: ['rebellion', 'Freelance Arms Dealer', 'arms_dealer'],
-      rebel_black_market_agent: ['rebellion', 'Black Market Smuggler', 'smuggler'],
-      imperial_arms_hunter: ['empire', 'Freelance Arms Dealer', 'arms_dealer'],
-      imperial_smuggler_hunter: ['empire', 'Black Market Smuggler', 'smuggler'],
+      rebel_arms_buyer: ['rebellion', 'Freelance Gunsmith', 'arms_dealer'],
+      rebel_black_market_agent: ['rebellion', 'Aether Smuggler', 'smuggler'],
+      imperial_arms_hunter: ['empire', 'Freelance Gunsmith', 'arms_dealer'],
+      imperial_smuggler_hunter: ['empire', 'Aether Smuggler', 'smuggler'],
     }
     for (const [key, [faction, target, targetKey]] of Object.entries(expected)) {
       const r = NARRATIVE_ROLES[key]
@@ -32,8 +32,8 @@ describe('narrative data', () => {
       expect(r.objectives[0], `${key} first objective`).toContain(target)
       expect([].concat(r.requires), `${key} requires`).toContain(targetKey)
     }
-    expect(NARRATIVE_ROLES.arms_dealer.title).toBe('Freelance Arms Dealer')
-    expect(NARRATIVE_ROLES.smuggler.title).toBe('Black Market Smuggler')
+    expect(NARRATIVE_ROLES.arms_dealer.title).toBe('Freelance Gunsmith')
+    expect(NARRATIVE_ROLES.smuggler.title).toBe('Aether Smuggler')
   })
 
   it('gives every role a distinct icon and title', () => {
@@ -228,7 +228,7 @@ describe('NarrativeManager', () => {
 
   it('warns when an assigned role has nobody to target', () => {
     setup({ users: { u1: { name: 'Ana', narrativeRole: 'rebel_arms_buyer' }, u2: { name: 'Ben', narrativeRole: 'smuggler' } } })
-    expect(screen.getByText(/No Freelance Arms Dealer is assigned/)).toBeInTheDocument()
+    expect(screen.getByText(/No Freelance Gunsmith is assigned/)).toBeInTheDocument()
   })
 
   it('does not warn once the targeted role is assigned to someone', () => {
@@ -238,7 +238,7 @@ describe('NarrativeManager', () => {
 
   it('warns when a win condition cannot be completed with the crew as assigned', () => {
     setup({ users: { u1: { name: 'Ana', narrativeRole: 'imperial_security' }, u2: { name: 'Ben', narrativeRole: 'rebel_spy' } } })
-    expect(screen.getByText(/Win condition can't be completed: it needs 2 Rebellion members but only 1 is assigned/)).toBeInTheDocument()
+    expect(screen.getByText(/Win condition can't be completed: it needs 2 League members but only 1 is assigned/)).toBeInTheDocument()
   })
 
   it('does not warn when the win condition can be completed', () => {
@@ -251,12 +251,12 @@ describe('NarrativeManager', () => {
 
   it('lists every missing required role, with the right grammar', () => {
     setup({ users: { u1: { name: 'Ana', narrativeRole: 'imperial_arms_hunter' } } })
-    expect(screen.getByText(/No Freelance Arms Dealer and Rebel Arms Procurement Officer are assigned, so this role has nobody to target/)).toBeInTheDocument()
+    expect(screen.getByText(/No Freelance Gunsmith and League Quartermaster are assigned, so this role has nobody to target/)).toBeInTheDocument()
   })
 
   it('shows one warning per player: the missing target takes priority over the win-condition warning', () => {
     setup({ users: { u1: { name: 'Ana', narrativeRole: 'rebel_arms_buyer' } } })
-    expect(screen.getByText(/No Freelance Arms Dealer is assigned/)).toBeInTheDocument()
+    expect(screen.getByText(/No Freelance Gunsmith is assigned/)).toBeInTheDocument()
     expect(screen.queryByText(/Win condition can't be completed/)).not.toBeInTheDocument()
   })
 

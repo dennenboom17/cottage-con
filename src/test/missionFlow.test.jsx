@@ -52,7 +52,7 @@ describe('App – mission claims end to end', () => {
   const claimFromTheDossier = async (user) => {
     await user.click(screen.getAllByTitle('Personal Log')[0])
     await user.click(await screen.findByRole('button', { name: /open your dossier/i }))
-    await user.selectOptions(screen.getByLabelText('The Freelance Arms Dealer'), 'd')
+    await user.selectOptions(screen.getByLabelText('The Freelance Gunsmith'), 'd')
     fireEvent.change(screen.getByLabelText('Proof photo'), { target: { files: [new File(['big phone photo'], 'proof.jpg', { type: 'image/jpeg' })] } })
     await screen.findByAltText('Proof preview')
     setDoc.mockClear()
@@ -92,14 +92,14 @@ describe('App – mission claims end to end', () => {
     const user = userEvent.setup()
     await user.click(screen.getAllByTitle('Personal Log')[0])
     await user.click(await screen.findByRole('button', { name: /open your dossier/i }))
-    await user.selectOptions(screen.getByLabelText('The Freelance Arms Dealer'), 'd')
+    await user.selectOptions(screen.getByLabelText('The Freelance Gunsmith'), 'd')
     fireEvent.change(screen.getByLabelText('Proof photo'), { target: { files: [new File(['x'], 'p.jpg', { type: 'image/jpeg' })] } })
     await screen.findByAltText('Proof preview')
 
     setDoc.mockRejectedValueOnce(new Error('permission-denied'))
     await user.click(screen.getByRole('button', { name: /send claim for review/i }))
     expect(await screen.findByText(/permission-denied/)).toBeInTheDocument()
-    expect(screen.getByLabelText('The Freelance Arms Dealer')).toHaveValue('d')
+    expect(screen.getByLabelText('The Freelance Gunsmith')).toHaveValue('d')
     expect(screen.getByAltText('Proof preview')).toBeInTheDocument()
   })
 

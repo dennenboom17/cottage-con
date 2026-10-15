@@ -50,14 +50,14 @@ describe('win conditions: data', () => {
     }
   })
 
-  it('has the Rebel arms buyer meet the Freelance Arms Dealer', () => {
+  it('has the Rebel arms buyer meet the Freelance Gunsmith', () => {
     const w = winOf('rebel_arms_buyer')
     expect(w.type).toBe('meet')
     expect(w.slots[0]).toEqual(expect.objectContaining({ role: 'arms_dealer' }))
     expect(w.slots[1]).toEqual(expect.objectContaining({ faction: 'rebellion', minCrew: 12 })) // a witness, in a big game
   })
 
-  it('has the Imperial investigator identify both the dealer and the Rebel buyer', () => {
+  it('has the Imperial investigator identify both the dealer and the League buyer', () => {
     const w = winOf('imperial_arms_hunter')
     expect(w.type).toBe('identify')
     expect(w.slots.map(sl => sl.role)).toEqual(['arms_dealer', 'rebel_arms_buyer'])
@@ -84,11 +84,11 @@ describe('unachievableWin', () => {
   })
 
   it('names the missing role', () => {
-    expect(unachievableWin('rebel_black_market_agent', people.filter(p => p.id !== 's'), 'me')).toBe('no Black Market Smuggler is assigned')
+    expect(unachievableWin('rebel_black_market_agent', people.filter(p => p.id !== 's'), 'me')).toBe('no Aether Smuggler is assigned')
   })
 
   it("does not count the player as their own target", () => {
-    expect(unachievableWin('arms_dealer', [{ id: 'd', narrativeRole: 'arms_dealer' }], 'd')).toBe('no Rebel Arms Procurement Officer is assigned')
+    expect(unachievableWin('arms_dealer', [{ id: 'd', narrativeRole: 'arms_dealer' }], 'd')).toBe('no League Quartermaster is assigned')
   })
 
   it('counts faction members, excluding the player', () => {
@@ -99,8 +99,8 @@ describe('unachievableWin', () => {
 
   it('says how many are short', () => {
     const crew = [{ id: 'a', narrativeRole: 'imperial_security' }, { id: 'b', narrativeRole: 'rebel_spy' }]
-    expect(unachievableWin('imperial_security', crew, 'a')).toBe('it needs 2 Rebellion members but only 1 is assigned')
-    expect(unachievableWin('imperial_agent', [{ id: 'a', narrativeRole: 'imperial_agent' }], 'a')).toBe('it needs 1 Rebellion member but only 0 are assigned')
+    expect(unachievableWin('imperial_security', crew, 'a')).toBe('it needs 2 League members but only 1 is assigned')
+    expect(unachievableWin('imperial_agent', [{ id: 'a', narrativeRole: 'imperial_agent' }], 'a')).toBe('it needs 1 League member but only 0 are assigned')
   })
 
   it('never blocks a board mission or an unknown role', () => {
