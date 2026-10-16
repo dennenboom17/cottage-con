@@ -29,3 +29,6 @@ dist-ssr
 # BGG data dump (licensed data - never commit the CSV/zip or a generated index)
 boardgames_ranks*
 bgg-index*
+
+# Print-size poster PNGs (node scripts/posters/render-png.cjs); the SVGs in public/posters are the source
+posters-print/

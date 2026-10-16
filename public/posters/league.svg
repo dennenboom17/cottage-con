@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" width="600" height="900" role="img" aria-labelledby="t d">
+<title id="t">The Gearwrights' League: Hands That Build the World</title>
+<desc id="d">Steampunk propaganda poster for the Gearwrights' League: a raised fist gripping a spanner across a bold green band, in the style of a Constructivist workers' poster.</desc>
+<defs>
+  <linearGradient id="wedge" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1f8a66"/><stop offset="1" stop-color="#0f4a38"/></linearGradient>
+  <radialGradient id="vig" cx="50%" cy="50%" r="75%"><stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".4"/></radialGradient>
+  <filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="7" result="n"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 0.22"/></feComponentTransfer></filter></defs>
+
+  <rect width="600" height="900" fill="#efe2bf"/>
+  <g opacity=".32"><path d="M300,640 L1298.75,689.98 L1281.47,831.61 Z" fill="#c8962b"/><path d="M300,640 L1244.21,969.34 L1187.73,1100.36 Z" fill="#c8962b"/><path d="M300,640 L1113.18,1222.01 L1022.08,1331.81 Z" fill="#c8962b"/><path d="M300,640 L916.27,1427.53 L797.92,1507.22 Z" fill="#c8962b"/><path d="M300,640 L669.43,1569.26 L533.43,1612.37 Z" fill="#c8962b"/><path d="M300,640 L392.67,1635.7 L250.02,1638.75 Z" fill="#c8962b"/><path d="M300,640 L108.39,1621.47 L-29.34,1584.21 Z" fill="#c8962b"/><path d="M300,640 L-160.36,1527.73 L-282.01,1453.18 Z" fill="#c8962b"/><path d="M300,640 L-391.81,1362.08 L-487.53,1256.27 Z" fill="#c8962b"/><path d="M300,640 L-567.22,1137.92 L-629.26,1009.43 Z" fill="#c8962b"/><path d="M300,640 L-672.37,873.43 L-695.7,732.67 Z" fill="#c8962b"/><path d="M300,640 L-698.75,590.02 L-681.47,448.39 Z" fill="#c8962b"/><path d="M300,640 L-644.21,310.66 L-587.73,179.64 Z" fill="#c8962b"/><path d="M300,640 L-513.18,57.99 L-422.08,-51.81 Z" fill="#c8962b"/><path d="M300,640 L-316.27,-147.53 L-197.92,-227.22 Z" fill="#c8962b"/><path d="M300,640 L-69.43,-289.26 L66.57,-332.37 Z" fill="#c8962b"/><path d="M300,640 L207.33,-355.7 L349.98,-358.75 Z" fill="#c8962b"/><path d="M300,640 L491.61,-341.47 L629.34,-304.21 Z" fill="#c8962b"/><path d="M300,640 L760.36,-247.73 L882.01,-173.18 Z" fill="#c8962b"/><path d="M300,640 L991.81,-82.08 L1087.53,23.73 Z" fill="#c8962b"/><path d="M300,640 L1167.22,142.08 L1229.26,270.57 Z" fill="#c8962b"/><path d="M300,640 L1272.37,406.57 L1295.7,547.33 Z" fill="#c8962b"/></g>
+
+  <!-- the bold diagonal band -->
+  <path d="M0,230 L600,90 L600,560 L0,700 Z" fill="url(#wedge)"/>
+  <path d="M0,230 L600,90 L600,112 L0,252 Z" fill="#15130f"/>
+  <path d="M0,678 L600,538 L600,560 L0,700 Z" fill="#15130f"/>
+
+  <!-- gears biting into the band -->
+  <path d="M133.29,484.94 L163.7,489.26 L163.7,510.74 L133.29,515.06 L130.15,534.9 L157.73,548.41 L151.09,568.83 L120.84,563.54 L111.72,581.45 L133.78,602.81 L121.16,620.19 L94.02,605.81 L79.81,620.02 L94.19,647.16 L76.81,659.78 L55.45,637.72 L37.54,646.84 L42.83,677.09 L22.41,683.73 L8.9,656.15 L-10.94,659.29 L-15.26,689.7 L-36.74,689.7 L-41.06,659.29 L-60.9,656.15 L-74.41,683.73 L-94.83,677.09 L-89.54,646.84 L-107.45,637.72 L-128.81,659.78 L-146.19,647.16 L-131.81,620.02 L-146.02,605.81 L-173.16,620.19 L-185.78,602.81 L-163.72,581.45 L-172.84,563.54 L-203.09,568.83 L-209.73,548.41 L-182.15,534.9 L-185.29,515.06 L-215.7,510.74 L-215.7,489.26 L-185.29,484.94 L-182.15,465.1 L-209.73,451.59 L-203.09,431.17 L-172.84,436.46 L-163.72,418.55 L-185.78,397.19 L-173.16,379.81 L-146.02,394.19 L-131.81,379.98 L-146.19,352.84 L-128.81,340.22 L-107.45,362.28 L-89.54,353.16 L-94.83,322.91 L-74.41,316.27 L-60.9,343.85 L-41.06,340.71 L-36.74,310.3 L-15.26,310.3 L-10.94,340.71 L8.9,343.85 L22.41,316.27 L42.83,322.91 L37.54,353.16 L55.45,362.28 L76.81,340.22 L94.19,352.84 L79.81,379.98 L94.02,394.19 L121.16,379.81 L133.78,397.19 L111.72,418.55 L120.84,436.46 L151.09,431.17 L157.73,451.59 L130.15,465.1 Z" fill="#15130f" stroke="#c8962b" stroke-width="6" stroke-linejoin="round"/>
+  <circle cx="-26" cy="500" r="62" fill="#1f8a66" stroke="#c8962b" stroke-width="6"/>
+  <path d="M755.31,266.83 L779.7,270.58 L779.7,289.42 L755.31,293.17 L752.26,310.48 L773.9,322.35 L767.45,340.05 L743.25,335.23 L734.46,350.46 L750.73,369.01 L738.63,383.44 L717.53,370.64 L704.06,381.94 L713.01,404.94 L696.7,414.36 L681.25,395.11 L664.73,401.12 L665.27,425.79 L646.72,429.07 L638.79,405.69 L621.21,405.69 L613.28,429.07 L594.73,425.79 L595.27,401.12 L578.75,395.11 L563.3,414.36 L546.99,404.94 L555.94,381.94 L542.47,370.64 L521.37,383.44 L509.27,369.01 L525.54,350.46 L516.75,335.23 L492.55,340.05 L486.1,322.35 L507.74,310.48 L504.69,293.17 L480.3,289.42 L480.3,270.58 L504.69,266.83 L507.74,249.52 L486.1,237.65 L492.55,219.95 L516.75,224.77 L525.54,209.54 L509.27,190.99 L521.37,176.56 L542.47,189.36 L555.94,178.06 L546.99,155.06 L563.3,145.64 L578.75,164.89 L595.27,158.88 L594.73,134.21 L613.28,130.93 L621.21,154.31 L638.79,154.31 L646.72,130.93 L665.27,134.21 L664.73,158.88 L681.25,164.89 L696.7,145.64 L713.01,155.06 L704.06,178.06 L717.53,189.36 L738.63,176.56 L750.73,190.99 L734.46,209.54 L743.25,224.77 L767.45,219.95 L773.9,237.65 L752.26,249.52 Z" fill="#0f4a38" stroke="#c8962b" stroke-width="6" stroke-linejoin="round"/>
+  <circle cx="630" cy="280" r="48" fill="#15130f" stroke="#c8962b" stroke-width="6"/>
+
+  
+  <g transform="translate(0,40)">
+    <!-- spanner: handle and open jaw -->
+    <rect x="288" y="150" width="24" height="270" rx="6" fill="#c8962b" stroke="#15130f" stroke-width="5"/>
+    <path d="M286,78.4 A42,42 0 1,0 314,78.4 L314,108 L286,108 Z" fill="#c8962b" stroke="#15130f" stroke-width="5" stroke-linejoin="round"/>
+    <circle cx="300" cy="128" r="9" fill="#15130f"/>
+    <path d="M294,200 L294,400" stroke="#efc766" stroke-width="4" stroke-linecap="round" opacity=".8"/>
+    <!-- sleeve and cuff -->
+    <path d="M236,560 L230,650 H370 L364,560 Z" fill="#15130f"/>
+    <rect x="226" y="548" width="148" height="34" rx="6" fill="#c8962b" stroke="#15130f" stroke-width="5"/>
+    <circle cx="246" cy="565" r="4.5" fill="#15130f" stroke="#efc766" stroke-width="1"/><circle cx="274" cy="565" r="4.5" fill="#15130f" stroke="#efc766" stroke-width="1"/><circle cx="300" cy="565" r="4.5" fill="#15130f" stroke="#efc766" stroke-width="1"/><circle cx="326" cy="565" r="4.5" fill="#15130f" stroke="#efc766" stroke-width="1"/><circle cx="354" cy="565" r="4.5" fill="#15130f" stroke="#efc766" stroke-width="1"/>
+    <!-- fingers: four stacked knuckles -->
+    <rect x="232" y="372" width="136" height="34" rx="17" fill="#15130f" stroke="#efe2bf" stroke-width="2.5"/>
+      <path d="M252,381 H348" stroke="#efe2bf" stroke-width="2" opacity=".45" stroke-linecap="round"/><rect x="234" y="408" width="136" height="34" rx="17" fill="#15130f" stroke="#efe2bf" stroke-width="2.5"/>
+      <path d="M252,417 H348" stroke="#efe2bf" stroke-width="2" opacity=".45" stroke-linecap="round"/><rect x="232" y="444" width="136" height="34" rx="17" fill="#15130f" stroke="#efe2bf" stroke-width="2.5"/>
+      <path d="M252,453 H348" stroke="#efe2bf" stroke-width="2" opacity=".45" stroke-linecap="round"/><rect x="234" y="480" width="136" height="34" rx="17" fill="#15130f" stroke="#efe2bf" stroke-width="2.5"/>
+      <path d="M252,489 H348" stroke="#efe2bf" stroke-width="2" opacity=".45" stroke-linecap="round"/>
+    <!-- thumb -->
+    <rect x="214" y="396" width="46" height="128" rx="23" fill="#15130f" stroke="#efe2bf" stroke-width="2.5" transform="rotate(-8 237 460)"/>
+    <path d="M226,424 V500" stroke="#efe2bf" stroke-width="2" opacity=".45" stroke-linecap="round" transform="rotate(-8 237 460)"/>
+    <!-- palm base joining the fist to the cuff -->
+    <path d="M238,510 H362 L366,552 H234 Z" fill="#15130f" stroke="#efe2bf" stroke-width="2.5" stroke-linejoin="round"/>
+  </g>
+
+  <!-- banner across the top -->
+  <g transform="rotate(-3 300 70)">
+    <path d="M-20,34 H620 V108 H-20 Z" fill="#15130f"/>
+    <path d="M-20,34 H620" stroke="#c8962b" stroke-width="5"/><path d="M-20,108 H620" stroke="#c8962b" stroke-width="5"/>
+    <text x="300" y="88" text-anchor="middle" font-family="Cinzel, Impact, Georgia, 'Times New Roman', serif" font-weight="900" font-size="38" fill="#efe2bf" textLength="520" lengthAdjust="spacingAndGlyphs">THE GEARWRIGHTS' LEAGUE</text>
+  </g>
+  
+  <!-- slogan -->
+  <text x="300" y="738" text-anchor="middle" font-family="Cinzel, Impact, Georgia, 'Times New Roman', serif" font-weight="900" font-size="46" fill="#15130f" textLength="500" lengthAdjust="spacingAndGlyphs">HANDS THAT BUILD</text>
+  <text x="300" y="812" text-anchor="middle" font-family="Cinzel, Impact, Georgia, 'Times New Roman', serif" font-weight="900" font-size="86" fill="#b2472a" stroke="#15130f" stroke-width="4" paint-order="stroke" textLength="500" lengthAdjust="spacingAndGlyphs">THE WORLD</text>
+  <rect x="40" y="824" width="520" height="30" fill="#15130f"/>
+  <text x="300" y="845" text-anchor="middle" font-family="Cinzel, Impact, Georgia, 'Times New Roman', serif" font-weight="900" font-size="16" fill="#efc766" textLength="480" lengthAdjust="spacingAndGlyphs" letter-spacing="2">WORKERS · ENGINEERS · GEARWRIGHTS</text>
+  <text x="300" y="869" text-anchor="middle" font-family="Cinzel, Impact, Georgia, 'Times New Roman', serif" font-weight="900" font-size="11" fill="#15130f" textLength="420" lengthAdjust="spacingAndGlyphs">THE ENGINES RUN ON US · COTTAGE CON · NOV 26–29</text>
+
+  <rect x="14" y="14" width="572" height="872" fill="none" stroke="#15130f" stroke-width="8"/>
+  <rect x="26" y="26" width="548" height="848" fill="none" stroke="#c8962b" stroke-width="2.5"/>
+  <rect width="600" height="900" fill="url(#vig)"/>
+  <rect width="600" height="900" filter="url(#grain)" opacity=".55" style="mix-blend-mode:multiply" pointer-events="none"/>
+</svg>

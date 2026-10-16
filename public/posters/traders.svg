@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" width="600" height="900" role="img" aria-labelledby="t d">
+<title id="t">The Free Traders: Free Trade Flies Under Any Flag</title>
+<desc id="d">Steampunk propaganda poster for the Free Traders: a cargo airship crossing a setting sun above a bank of clouds, with a pair of balance scales, in the style of a vintage travel poster.</desc>
+<defs>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0c3040"/><stop offset=".55" stop-color="#14586a"/><stop offset="1" stop-color="#e98a3a"/></linearGradient>
+  <radialGradient id="sun" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffd56a"/><stop offset=".7" stop-color="#f2a93b"/><stop offset="1" stop-color="#e0702a"/></radialGradient>
+  <radialGradient id="vig" cx="50%" cy="50%" r="72%"><stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".5"/></radialGradient>
+  <linearGradient id="goldg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6d672"/><stop offset=".5" stop-color="#e8b730"/><stop offset="1" stop-color="#8d6a12"/></linearGradient>
+  <filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="7" result="n"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 0.22"/></feComponentTransfer></filter></defs>
+
+  <rect width="600" height="900" fill="url(#sky)"/>
+  <g opacity=".16"><path d="M300,330 L1099.36,361.99 L1081.66,500.31 Z" fill="#ffd56a"/><path d="M300,330 L1040.21,633.46 L976.27,757.39 Z" fill="#ffd56a"/><path d="M300,330 L891.78,868.33 L789.31,962.91 Z" fill="#ffd56a"/><path d="M300,330 L671.97,1038.26 L543.34,1092.09 Z" fill="#ffd56a"/><path d="M300,330 L407.3,1122.77 L268.01,1129.36 Z" fill="#ffd56a"/><path d="M300,330 L129.69,1111.66 L-3.46,1070.21 Z" fill="#ffd56a"/><path d="M300,330 L-127.39,1006.27 L-238.33,921.78 Z" fill="#ffd56a"/><path d="M300,330 L-332.91,819.31 L-408.26,701.97 Z" fill="#ffd56a"/><path d="M300,330 L-462.09,573.34 L-492.77,437.3 Z" fill="#ffd56a"/><path d="M300,330 L-499.36,298.01 L-481.66,159.69 Z" fill="#ffd56a"/><path d="M300,330 L-440.21,26.54 L-376.27,-97.39 Z" fill="#ffd56a"/><path d="M300,330 L-291.78,-208.33 L-189.31,-302.91 Z" fill="#ffd56a"/><path d="M300,330 L-71.97,-378.26 L56.66,-432.09 Z" fill="#ffd56a"/><path d="M300,330 L192.7,-462.77 L331.99,-469.36 Z" fill="#ffd56a"/><path d="M300,330 L470.31,-451.66 L603.46,-410.21 Z" fill="#ffd56a"/><path d="M300,330 L727.39,-346.27 L838.33,-261.78 Z" fill="#ffd56a"/><path d="M300,330 L932.91,-159.31 L1008.26,-41.97 Z" fill="#ffd56a"/><path d="M300,330 L1062.09,86.66 L1092.77,222.7 Z" fill="#ffd56a"/></g>
+
+  <!-- the setting sun -->
+  <circle cx="300" cy="330" r="200" fill="#f2a93b" opacity=".25"/>
+  <circle cx="300" cy="330" r="160" fill="url(#sun)"/>
+  <rect x="130" y="372" width="340" height="5" fill="#e98a3a" opacity=".55"/><rect x="130" y="394" width="340" height="7.4" fill="#e98a3a" opacity=".55"/><rect x="130" y="416" width="340" height="9.8" fill="#e98a3a" opacity=".55"/><rect x="130" y="438" width="340" height="12.2" fill="#e98a3a" opacity=".55"/><rect x="130" y="460" width="340" height="14.6" fill="#e98a3a" opacity=".55"/>
+  <g transform="translate(104,232) scale(0.9)" opacity="0.9" fill="#f3dfb8">
+  <ellipse cx="0" cy="0" rx="70" ry="22"/><ellipse cx="-40" cy="-12" rx="34" ry="22"/><ellipse cx="22" cy="-18" rx="40" ry="26"/><ellipse cx="62" cy="-4" rx="28" ry="18"/></g><g transform="translate(504,190) scale(0.7)" opacity="0.8" fill="#f3dfb8">
+  <ellipse cx="0" cy="0" rx="70" ry="22"/><ellipse cx="-40" cy="-12" rx="34" ry="22"/><ellipse cx="22" cy="-18" rx="40" ry="26"/><ellipse cx="62" cy="-4" rx="28" ry="18"/></g><g transform="translate(486,462) scale(1.1)" opacity="0.95" fill="#f3dfb8">
+  <ellipse cx="0" cy="0" rx="70" ry="22"/><ellipse cx="-40" cy="-12" rx="34" ry="22"/><ellipse cx="22" cy="-18" rx="40" ry="26"/><ellipse cx="62" cy="-4" rx="28" ry="18"/></g><g transform="translate(92,505) scale(1)" opacity="0.95" fill="#f3dfb8">
+  <ellipse cx="0" cy="0" rx="70" ry="22"/><ellipse cx="-40" cy="-12" rx="34" ry="22"/><ellipse cx="22" cy="-18" rx="40" ry="26"/><ellipse cx="62" cy="-4" rx="28" ry="18"/></g>
+
+  <!-- the airship, dropping its cargo -->
+  <g transform="translate(300,322) scale(1.45)">
+    <path d="M-124,-8 L-168,-44 L-150,-6 L-168,34 L-124,12 Z" fill="#d2bd8a" stroke="#14110e" stroke-width="2.4" stroke-linejoin="round"/>
+    <ellipse cx="0" cy="0" rx="130" ry="46" fill="#f4e3bd" stroke="#14110e" stroke-width="3"/>
+    <clipPath id="env300322"><ellipse cx="0" cy="0" rx="130" ry="46"/></clipPath>
+    <g clip-path="url(#env300322)"><path d="M-90,-33.19371153105811 Q-97.2,0 -90,33.19371153105811" stroke="#b8a470" stroke-width="1.6" fill="none"/><path d="M-62,-40.43147171851952 Q-66.96000000000001,0 -62,40.43147171851952" stroke="#b8a470" stroke-width="1.6" fill="none"/><path d="M-34,-44.398880523229145 Q-36.72,0 -34,44.398880523229145" stroke="#b8a470" stroke-width="1.6" fill="none"/><path d="M-6,-45.95097979780951 Q-6.48,0 -6,45.95097979780951" stroke="#b8a470" stroke-width="1.6" fill="none"/><path d="M22,-45.33651688554834 Q23.76,0 22,45.33651688554834" stroke="#b8a470" stroke-width="1.6" fill="none"/><path d="M50,-42.46153846153847 Q54,0 50,42.46153846153847" stroke="#b8a470" stroke-width="1.6" fill="none"/><path d="M78,-36.800000000000004 Q84.24000000000001,0 78,36.800000000000004" stroke="#b8a470" stroke-width="1.6" fill="none"/><rect x="-130" y="-6" width="260" height="12" fill="#c4452b" opacity=".9"/><ellipse cx="-28" cy="-24" rx="70" ry="12" fill="#fff" opacity=".13"/></g>
+    <path d="M-60,40 L-70,62 M60,40 L70,62 M-20,45 L-24,62 M20,45 L24,62" stroke="#14110e" stroke-width="2" fill="none"/>
+    <rect x="-82" y="60" width="164" height="26" rx="8" fill="#8a6a3a" stroke="#14110e" stroke-width="3"/>
+    <g fill="#ffd56a"><rect x="-62" y="66" width="12" height="11" rx="3"/><rect x="-40" y="66" width="12" height="11" rx="3"/><rect x="-18" y="66" width="12" height="11" rx="3"/><rect x="4" y="66" width="12" height="11" rx="3"/><rect x="26" y="66" width="12" height="11" rx="3"/><rect x="48" y="66" width="12" height="11" rx="3"/></g>
+    <circle cx="134" cy="12" r="6" fill="#14110e"/><g stroke="#14110e" stroke-width="3" stroke-linecap="round"><path d="M134,-8 L134,32"/><path d="M122,12 L146,12"/></g>
+    <path d="M0,-46 L0,-66" stroke="#14110e" stroke-width="2.4"/><path d="M0,-66 L24,-60 L0,-54 Z" fill="#c4452b" stroke="#14110e" stroke-width="1.5"/>
+  </g>
+  <g transform="translate(300,378.5) scale(0.95)"><g>
+  <path d="M-52,70 L-40,128 M52,70 L40,128 M0,70 V128" stroke="#14110e" stroke-width="3"/>
+  <rect x="-58" y="124" width="46" height="40" fill="#b88a4a" stroke="#14110e" stroke-width="4"/><path d="M-58,124 L-12,164 M-12,124 L-58,164" stroke="#14110e" stroke-width="2.4"/>
+  <rect x="-8" y="124" width="36" height="40" fill="#c4452b" stroke="#14110e" stroke-width="4"/><path d="M-8,144 H28" stroke="#14110e" stroke-width="2.4"/>
+  <rect x="32" y="130" width="34" height="34" fill="#8a6a3a" stroke="#14110e" stroke-width="4"/><path d="M32,147 H66" stroke="#14110e" stroke-width="2.4"/>
+</g></g>
+
+  <!-- cloud bank and scales -->
+  <path d="M0,690 Q80,650 170,672 T330,664 T500,676 T600,660 V900 H0 Z" fill="#f3dfb8"/>
+  <path d="M0,720 Q100,690 200,708 T400,702 T600,712 V900 H0 Z" fill="#e8cf9c"/>
+  <g transform="translate(300,718) scale(0.7)"><g>
+  <path d="M0,-70 V60" stroke="#14110e" stroke-width="9" stroke-linecap="round"/>
+  <path d="M-30,64 H30 M-18,52 H18" stroke="#14110e" stroke-width="9" stroke-linecap="round"/>
+  <path d="M-84,-52 H84" stroke="#14110e" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="0" cy="-70" r="11" fill="#e8b730" stroke="#14110e" stroke-width="5"/>
+  <path d="M-84,-52 L-118,2 M-84,-52 L-50,2" stroke="#14110e" stroke-width="3.5"/><path d="M-124,2 H-44 Q-48,30 -84,32 Q-120,30 -124,2 Z" fill="#e8b730" stroke="#14110e" stroke-width="5" stroke-linejoin="round"/><path d="M84,-52 L50,2 M84,-52 L118,2" stroke="#14110e" stroke-width="3.5"/><path d="M44,2 H124 Q120,30 84,32 Q48,30 44,2 Z" fill="#e8b730" stroke="#14110e" stroke-width="5" stroke-linejoin="round"/>
+  <circle cx="-84" cy="-4" r="13" fill="#e8b730" stroke="#14110e" stroke-width="4"/><circle cx="-60" cy="-8" r="13" fill="#e8b730" stroke="#14110e" stroke-width="4"/>
+  <rect x="72" y="-30" width="26" height="28" fill="#8a6a3a" stroke="#14110e" stroke-width="4"/><rect x="92" y="-22" width="22" height="20" fill="#b88a4a" stroke="#14110e" stroke-width="4"/>
+</g></g>
+
+  
+  <rect x="14" y="14" width="572" height="872" fill="none" stroke="#e8b730" stroke-width="7"/>
+  <rect x="28" y="28" width="544" height="844" fill="none" stroke="#e8b730" stroke-width="1.6"/>
+  <g><path d="M42.73,25.19 L48.87,25.63 L48.87,30.37 L42.73,30.81 L41.57,34.39 L46.27,38.35 L43.49,42.18 L38.27,38.93 L35.23,41.14 L36.7,47.11 L32.19,48.58 L29.88,42.88 L26.12,42.88 L23.81,48.58 L19.3,47.11 L20.77,41.14 L17.73,38.93 L12.51,42.18 L9.73,38.35 L14.43,34.39 L13.27,30.81 L7.13,30.37 L7.13,25.63 L13.27,25.19 L14.43,21.61 L9.73,17.65 L12.51,13.82 L17.73,17.07 L20.77,14.86 L19.3,8.89 L23.81,7.42 L26.12,13.12 L29.88,13.12 L32.19,7.42 L36.7,8.89 L35.23,14.86 L38.27,17.07 L43.49,13.82 L46.27,17.65 L41.57,21.61 Z" fill="#e8b730" stroke="#14110e" stroke-width="1.4"/><circle cx="28" cy="28" r="6" fill="#14110e"/></g><g><path d="M586.73,25.19 L592.87,25.63 L592.87,30.37 L586.73,30.81 L585.57,34.39 L590.27,38.35 L587.49,42.18 L582.27,38.93 L579.23,41.14 L580.7,47.11 L576.19,48.58 L573.88,42.88 L570.12,42.88 L567.81,48.58 L563.3,47.11 L564.77,41.14 L561.73,38.93 L556.51,42.18 L553.73,38.35 L558.43,34.39 L557.27,30.81 L551.13,30.37 L551.13,25.63 L557.27,25.19 L558.43,21.61 L553.73,17.65 L556.51,13.82 L561.73,17.07 L564.77,14.86 L563.3,8.89 L567.81,7.42 L570.12,13.12 L573.88,13.12 L576.19,7.42 L580.7,8.89 L579.23,14.86 L582.27,17.07 L587.49,13.82 L590.27,17.65 L585.57,21.61 Z" fill="#e8b730" stroke="#14110e" stroke-width="1.4"/><circle cx="572" cy="28" r="6" fill="#14110e"/></g><g><path d="M42.73,869.19 L48.87,869.63 L48.87,874.37 L42.73,874.81 L41.57,878.39 L46.27,882.35 L43.49,886.18 L38.27,882.93 L35.23,885.14 L36.7,891.11 L32.19,892.58 L29.88,886.88 L26.12,886.88 L23.81,892.58 L19.3,891.11 L20.77,885.14 L17.73,882.93 L12.51,886.18 L9.73,882.35 L14.43,878.39 L13.27,874.81 L7.13,874.37 L7.13,869.63 L13.27,869.19 L14.43,865.61 L9.73,861.65 L12.51,857.82 L17.73,861.07 L20.77,858.86 L19.3,852.89 L23.81,851.42 L26.12,857.12 L29.88,857.12 L32.19,851.42 L36.7,852.89 L35.23,858.86 L38.27,861.07 L43.49,857.82 L46.27,861.65 L41.57,865.61 Z" fill="#e8b730" stroke="#14110e" stroke-width="1.4"/><circle cx="28" cy="872" r="6" fill="#14110e"/></g><g><path d="M586.73,869.19 L592.87,869.63 L592.87,874.37 L586.73,874.81 L585.57,878.39 L590.27,882.35 L587.49,886.18 L582.27,882.93 L579.23,885.14 L580.7,891.11 L576.19,892.58 L573.88,886.88 L570.12,886.88 L567.81,892.58 L563.3,891.11 L564.77,885.14 L561.73,882.93 L556.51,886.18 L553.73,882.35 L558.43,878.39 L557.27,874.81 L551.13,874.37 L551.13,869.63 L557.27,869.19 L558.43,865.61 L553.73,861.65 L556.51,857.82 L561.73,861.07 L564.77,858.86 L563.3,852.89 L567.81,851.42 L570.12,857.12 L573.88,857.12 L576.19,851.42 L580.7,852.89 L579.23,858.86 L582.27,861.07 L587.49,857.82 L590.27,861.65 L585.57,865.61 Z" fill="#e8b730" stroke="#14110e" stroke-width="1.4"/><circle cx="572" cy="872" r="6" fill="#14110e"/></g>
+
+  <!-- header -->
+  <path d="M60,60 H540 L554,86 L540,112 H60 L46,86 Z" fill="#f6ead0" stroke="#e8b730" stroke-width="4"/>
+  <text x="300" y="97" text-anchor="middle" font-family="Cinzel, Georgia, 'Times New Roman', serif" font-weight="700" font-size="26" fill="#14110e" textLength="420" lengthAdjust="spacingAndGlyphs">THE FREE TRADERS</text>
+  <text x="300" y="138" text-anchor="middle" font-family="Cinzel, Georgia, 'Times New Roman', serif" font-weight="700" font-size="13" fill="#f6ead0" textLength="300" lengthAdjust="spacingAndGlyphs" letter-spacing="2">COTTAGE CON · NOV 26–29</text>
+
+  <!-- slogan -->
+  <rect x="44" y="788" width="512" height="84" fill="#14110e" opacity=".9" stroke="#e8b730" stroke-width="3"/>
+  <text x="300" y="827" text-anchor="middle" font-family="Cinzel, Georgia, 'Times New Roman', serif" font-weight="700" font-size="38" fill="#f6ead0" textLength="470" lengthAdjust="spacingAndGlyphs">FREE TRADE FLIES</text>
+  <text x="300" y="862" text-anchor="middle" font-family="Cinzel, Georgia, 'Times New Roman', serif" font-weight="700" font-size="33" fill="#e8b730" textLength="470" lengthAdjust="spacingAndGlyphs">UNDER ANY FLAG</text>
+
+  <rect width="600" height="900" fill="url(#vig)"/>
+  <rect width="600" height="900" filter="url(#grain)" opacity=".5" style="mix-blend-mode:multiply" pointer-events="none"/>
+</svg>
