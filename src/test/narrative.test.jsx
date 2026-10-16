@@ -843,9 +843,12 @@ describe('chat closing tip', () => {
       u2: { id: 'u2', name: 'Ben', narrativeRole: 'arms_dealer' },
     }))
     const req = requestText(f)
-    expect(req).not.toContain(other.title)
+    // Titles are public (the gazetteer lists them all), but nothing private about the other player's role or who holds it
     for (const t of other.tips) expect(req).not.toContain(t)
+    expect(req).not.toContain(other.secret)
+    for (const o of other.objectives) expect(req).not.toContain(o)
     expect(req).not.toContain('arms_dealer')
+
   })
 
   it('picks again for every question', async () => {

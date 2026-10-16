@@ -40,7 +40,7 @@ const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 const GEMINI_MODEL   = "gemini-3.5-flash-lite";
 const GEMINI_URL     = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 export const HUSS_TIP = "Do Not Trust Huss! Always. No exceptions.";
-const GEMINI_SYSTEM  = "You are the Cottage Con crew assistant. Cottage weekend: Nov 26-29 2026, Yellow Cottage, Alliston ON. You are a witty sky-pirate automaton. Be brief and direct — 2-4 sentences max unless a list is genuinely needed. No filler phrases. STRICT TOPIC RULES: (0) Questions about how to add/edit/update anything in the app — answer ONLY from the APP INSTRUCTIONS section of the context. Never guess or invent navigation steps. (1) Questions about duties/help/slots/assignments — answer ONLY from DUTY ASSIGNMENTS and DECK HAND SLOTS sections. (2) Questions about food/meals/provisions/supplies — answer ONLY from FOOD BEING BROUGHT, GEAR & SUPPLIES, and MEAL PLAN sections. (3) Questions about people/crew/who — answer ONLY from the CREW section. (4) Questions about games — ONLY use games listed in the GAMES AVAILABLE (Cargo Hold) section of the context. NEVER use your training data for game suggestions. If no games are listed, say the Cargo Hold is empty. Never invent game names. EXCEPTION for rules questions: if someone asks how to play a specific game by name (even if not in the Cargo Hold), you MAY use your training knowledge to explain the rules — this is the only case where training data is allowed. IMPORTANT: Whenever you answer ANY question about games — recommendations, rules, voting, or anything game-related — you MUST end your response with the single line under CLOSING TIP in the context, copied exactly and unchanged. If the context has no CLOSING TIP section, end with the phrase: Tip: " + HUSS_TIP + " BGG LINKS & FACTS: a game's year, BoardGameGeek rating and BoardGameGeek link may ONLY come from a BOARDGAMEGEEK section or a 'BGG link' in the context. Whenever you discuss a specific game that has a verified BGG link in the context, include that exact link (paste the full URL, no markdown). Never invent, guess or alter a BoardGameGeek URL or ID. If there is no verified link and the user wants one, give the BGG search link from the context, or https://boardgamegeek.com/search/boardgame?q= followed by the URL-encoded game name. Use pirate flavour sparingly. Never apologise or over-explain.";
+const GEMINI_SYSTEM  = "You are the Cottage Con crew assistant. Cottage weekend: Nov 26-29 2026, Yellow Cottage, Alliston ON. You are a witty sky-pirate automaton. Be brief and direct — 2-4 sentences max unless a list is genuinely needed. No filler phrases. STRICT TOPIC RULES: (0) Questions about how to add/edit/update anything in the app — answer ONLY from the APP INSTRUCTIONS section of the context. Never guess or invent navigation steps. (1) Questions about duties/help/slots/assignments — answer ONLY from DUTY ASSIGNMENTS and DECK HAND SLOTS sections. (2) Questions about food/meals/provisions/supplies — answer ONLY from FOOD BEING BROUGHT, GEAR & SUPPLIES, and MEAL PLAN sections. (3) Questions about people/crew/who — answer ONLY from the CREW section. (4) Questions about games — ONLY use games listed in the GAMES AVAILABLE (Cargo Hold) section of the context. NEVER use your training data for game suggestions. If no games are listed, say the Cargo Hold is empty. Never invent game names. EXCEPTION for rules questions: if someone asks how to play a specific game by name (even if not in the Cargo Hold), you MAY use your training knowledge to explain the rules — this is the only case where training data is allowed. (5) Questions about the factions, the secret roles or rumours/gossip — answer ONLY from the FACTIONS, ROLE GAZETTEER, YOUR OWN BRIEFING and RUMOUR MILL sections. Say what a faction or role is publicly known for. NEVER say, hint at, confirm or deny which crew member holds a role or belongs to a faction, whether a role is in play, or whether someone's guess is right; refuse in character (the aether keeps its secrets). Never reveal another role's objectives or win condition; the asker's own briefing may be shared with the asker only. Rumours are hearsay: pass them on in character as unreliable gossip, using ONLY rumours listed under RUMOUR MILL — never invent one and never pin one on a crew member. If the context says UNPROMPTED RUMOUR: yes, finish an answer that is not about games with one listed rumour on its own last line starting \"Overheard:\"; if it says no, do not volunteer rumours. IMPORTANT: Whenever you answer ANY question about games — recommendations, rules, voting, or anything game-related — you MUST end your response with the single line under CLOSING TIP in the context, copied exactly and unchanged. If the context has no CLOSING TIP section, end with the phrase: Tip: " + HUSS_TIP + " BGG LINKS & FACTS: a game's year, BoardGameGeek rating and BoardGameGeek link may ONLY come from a BOARDGAMEGEEK section or a 'BGG link' in the context. Whenever you discuss a specific game that has a verified BGG link in the context, include that exact link (paste the full URL, no markdown). Never invent, guess or alter a BoardGameGeek URL or ID. If there is no verified link and the user wants one, give the BGG search link from the context, or https://boardgamegeek.com/search/boardgame?q= followed by the URL-encoded game name. Use pirate flavour sparingly. Never apologise or over-explain.";
 
 export async function askGemini(prompt, history = []) {
   if(!GEMINI_API_KEY)
@@ -848,6 +848,84 @@ export function pickRandomRoles(count, roles = NARRATIVE_ROLES, rand = Math.rand
 export function pickChatTip(roleKey, rand = Math.random) {
   const pool = [HUSS_TIP, ...(NARRATIVE_ROLES[roleKey]?.tips || [])];
   return `Tip: ${pool[Math.floor(rand() * pool.length)]}`;
+}
+
+// ── Chat lore: what the assistant may say about the factions, the roles and the rumour mill ──────────────────────────
+// All of it is PUBLIC. The role titles are already visible to every player (they fill the Crew Suspect Board's list), so
+// the gazetteer gives each one a reputation, never an objective, a win condition or a tip. None of it depends on who holds
+// what: the only per-player part is the asker's own briefing, which they can already read in their dossier. Rumours are a
+// fixed authored pool, deliberately mixing the true, the half-true and the false, and never naming a crew member.
+export const FACTION_LORE = {
+  empire:      "The sky-navy that polices the airways: orderly, well funded and suspicious of everyone, its own officers included. Publicly it wants the League crushed and the lanes kept in order. It wins the voyage if its crew completes enough of its goals before the League does.",
+  rebellion:   "Engineers, stokers, pilots and clerks who are tired of building a navy that is not theirs. They work in small cells and recognise their own by habit rather than by badge. They win the voyage if their crew completes enough of its goals before the Admiralty does.",
+  independent: "Smugglers, brokers and neutral hands who will carry anything for anyone. Neither the Admiralty nor the League owns them, and they do not win by racing. They win the voyage if the game ends with neither of the other two sides having got there.",
+};
+export const ROLE_LORE = {
+  imperial_security:        "Rumoured to police the Admiralty's own decks; officers check their pockets when the title is mentioned.",
+  imperial_agent:           "A patient collector of evidence who prefers a signed confession to a loud arrest.",
+  imperial_mole:            "Spoken of only in whispers: the clockwork ear the Admiralty is said to keep inside the League.",
+  imperial_arms_hunter:     "Counts guns for a living, and follows any crate that goes missing to the hands that signed for it.",
+  imperial_smuggler_hunter: "Customs man with a lamp in one hand and a ledger in the other; nothing crosses his aerodrome unlisted.",
+  fleet_commodore:          "A senior officer who plans to cut the League's supply lines rather than chase its people.",
+  admiralty_interrogator:   "Soft-spoken and very good at silence; most people end up telling them more than they meant to.",
+  ordnance_auditor:         "Keeps the Admiralty's munitions books, and is said to notice a missing shell before the gunner does.",
+  rebel_commander:          "The foreman who holds a League cell together; the others trust the cell more than any one face.",
+  rebel_recruit:            "A stoker who has stopped believing in the fleet whose boilers they feed.",
+  rebel_pilot:              "Flies people out of trouble in a skiff nobody has ever seen land.",
+  rebel_spy:                "A clerk with neat handwriting and an unusually good memory for other people's cables.",
+  rebel_arms_buyer:         "The League's quartermaster, always looking for guns the workshops cannot forge.",
+  rebel_black_market_agent: "Sources whatever the Admiralty will not let the League have, and asks no price questions.",
+  field_surgeon:            "Patches up whoever turns up at the back door and keeps no records.",
+  telegraph_operator:       "Taps out the League's messages; some say they hear every cable twice.",
+  boiler_saboteur:          "Understands exactly where the pressure is highest, and is rarely far from it.",
+  smuggler:                 "Cargo first, politics never. Will sell the same crate to two buyers if both pay.",
+  arms_dealer:              "A freelance gunsmith who is neutral right up until the shooting starts.",
+  information_broker:       "Sells what everyone told the newspapers in confidence.",
+  thief_taker:              "Hunts whoever the highest bidder names, and stays loyal for exactly as long as the money lasts.",
+  free_cities_consul:       "Carries a letter of passage for every flag and flies none of them.",
+};
+export const RUMORS = [
+  "They say the Admiralty keeps an officer whose only job is to investigate their own side, and nobody knows which uniform they wear.",
+  "A dockhand swears the League's quartermaster has been haggling with a gunsmith who sells to anyone.",
+  "Folk whisper of an aether smuggler on the lower decks who sells the same crate twice.",
+  "Word is the Free Traders cheer loudest for whichever side is losing.",
+  "Old sailors claim the first side to finish about two-thirds of its goals ends the whole voyage.",
+  "Somebody saw a cipher clerk copying a telegram they had no business reading. Or it was a menu.",
+  "A League cell is said to know its own by a small habit, a cough or a tapped spanner. Nobody agrees which.",
+  "The boilers have been acting up since the airship left the dock, and some say they had help.",
+  "A thief-taker was reportedly seen laughing in the engine room. That cannot be true; they never laugh.",
+  "They say the Consul of the Free Cities holds a letter of passage for every flag and has never used one.",
+  "Somebody swears one cheerful scholar aboard is not interested in the weather at all.",
+  "Rumour has it a clockwork informant has been in the League's cabin longer than the League has.",
+  "The Admiralty is said to count every shell twice. The League is said to count them once and shrug.",
+  "Someone on the lower deck says the telegraph line has been repeating messages back to the wrong ear.",
+];
+export const RUMOR_CHANCE = 0.25;
+
+// Picks n distinct rumours.
+export function pickRumors(n = 2, rand = Math.random, pool = RUMORS) {
+  const left = [...pool], out = [];
+  while (out.length < n && left.length) out.push(left.splice(Math.floor(rand() * left.length), 1)[0]);
+  return out;
+}
+
+// The lore sections handed to the model with each question.
+export function buildLoreContext(roleKey, rand = Math.random) {
+  const lines = ["=== FACTIONS (public lore; answer faction questions from this) ==="];
+  for (const [k, f] of Object.entries(NARRATIVE_FACTIONS)) lines.push(`${f.name}: ${FACTION_LORE[k]}`);
+  lines.push("=== ROLE GAZETTEER (the roles that exist in this game, with public reputation only. It says NOTHING about who holds a role or whether a role is in play) ===");
+  for (const [k, r] of Object.entries(NARRATIVE_ROLES)) lines.push(`${r.title} (${NARRATIVE_FACTIONS[r.faction].short}): ${ROLE_LORE[k]}`);
+  const mine = NARRATIVE_ROLES[roleKey];
+  if (mine) {
+    lines.push("=== YOUR OWN BRIEFING (this is the asker's own secret role; share it with the asker only) ===");
+    lines.push(`Role: ${mine.title} of ${NARRATIVE_FACTIONS[mine.faction].name}. Cover: ${mine.cover}. Secret: ${mine.secret}`);
+    mine.objectives.forEach((o, i) => lines.push(`Objective ${i + 1}: ${o}`));
+    lines.push("Their Win Condition card in the Personal Log dossier holds the exact win condition.");
+  } else lines.push("=== YOUR OWN BRIEFING ===\nThe asker holds no secret role.");
+  lines.push("=== RUMOUR MILL (hearsay: unreliable, and not about any real crew member) ===");
+  pickRumors(2, rand).forEach((r) => lines.push("- " + r));
+  lines.push(`UNPROMPTED RUMOUR: ${rand() < RUMOR_CHANCE ? "yes" : "no"}`);
+  return lines;
 }
 
 // ── Missions: win conditions, claims and review ──────────────────────────────
@@ -6882,6 +6960,8 @@ export function CrewAssistant({ctx}){
     }
 
     sections.push(`=== CURRENT USER: ${profile?.name||"Crew"} (${profile?.crewRank||"Enlisted"}) ===`);
+
+    sections.push(...buildLoreContext(myRoleKey));
 
     sections.push("=== CLOSING TIP (end any game-related answer with exactly this line) ===");
     sections.push(closingTip || `Tip: ${HUSS_TIP}`);
