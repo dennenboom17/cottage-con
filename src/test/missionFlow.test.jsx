@@ -6,6 +6,8 @@ import { setDoc, getDoc, onSnapshot } from 'firebase/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
 import App from '../App.jsx'
 
+vi.setConfig({ testTimeout: 20000 }) // these drive the whole app, so they are slow under load
+
 // The whole app, with Firebase mocked: a player sends a claim with a photo, and the organiser reviews it.
 const me = { uid: 'me', email: 'mia@example.com', emailVerified: true, displayName: 'Mia' }
 const profileDoc = (over = {}) => ({ id: 'me', name: 'Mia', email: 'mia@example.com', onboarded: true, crewRank: 'Enlisted', loginHistory: [], ...over })

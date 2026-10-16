@@ -606,7 +606,7 @@ describe('Crew suspect board check', () => {
 describe('nextSuspectScore', () => {
   it('starts a record on the first check', () => {
     expect(nextSuspectScore(undefined, { correct: 2, total: 5 }, 99)).toEqual({
-      checks: 1, history: [{ correct: 2, total: 5 }],
+      checks: 1, history: [{ correct: 2, total: 5, at: 99 }],
       bestCorrect: 2, bestTotal: 5, lastCorrect: 2, lastTotal: 5, solvedInChecks: null, updatedAt: 99,
     })
   })
@@ -639,14 +639,15 @@ describe('nextSuspectScore', () => {
     const rec = nextSuspectScore({ checks: 60, history, bestCorrect: 1, bestTotal: 2 }, { correct: 2, total: 2 })
     expect(rec.checks).toBe(61)
     expect(rec.history).toHaveLength(50)
-    expect(rec.history.at(-1)).toEqual({ correct: 2, total: 2 })
+    expect(rec.history.at(-1)).toMatchObject({ correct: 2, total: 2 })
   })
 
   it('copes with a missing or corrupt previous record', () => {
     for (const prev of [null, 'junk', 42, {}, { checks: 'x', history: 'nope', bestCorrect: 'a' }, { checks: -3, history: [null] }]) {
       const rec = nextSuspectScore(prev, { correct: 1, total: 2 })
       expect(rec.checks, JSON.stringify(prev)).toBe(1)
-      expect(rec.history).toEqual([{ correct: 1, total: 2 }])
+      expect(rec.history).toHaveLength(1)
+      expect(rec.history[0]).toMatchObject({ correct: 1, total: 2 })
       expect([rec.bestCorrect, rec.bestTotal]).toEqual([1, 2])
     }
   })

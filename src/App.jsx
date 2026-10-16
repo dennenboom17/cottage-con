@@ -969,21 +969,91 @@ export function attemptsUsed(uid, claims) {
 }
 export const attemptsLeft = (uid, claims) => Math.max(0, MAX_CLAIM_ATTEMPTS - attemptsUsed(uid, claims));
 
-// "board" missions are met automatically once any of the player's checks reaches the required number correct.
-export function boardMissionMet(roleKey, score) {
+// When a "board" mission was met (ms), or null. Uses the first qualifying check's own time; older checks saved before times
+// were recorded fall back to the last time the player checked.
+export function boardMetAt(roleKey, score) {
   const win = winOf(roleKey);
-  if (win?.type !== "board" || !score) return false;
-  const checks = [{ correct: score.bestCorrect, total: score.bestTotal }, ...(Array.isArray(score.history) ? score.history : [])];
-  return checks.some(c => c && c.total > 0 && c.correct <= c.total && c.correct >= boardRequired(c.total, win.minShare));
+  if (win?.type !== "board" || !score) return null;
+  const qualifies = c => !!c && c.total > 0 && c.correct <= c.total && c.correct >= boardRequired(c.total, win.minShare);
+  const hit = (Array.isArray(score.history) ? score.history : []).find(qualifies);
+  if (hit) return hit.at ?? score.updatedAt ?? 0;
+  return qualifies({ correct: score.bestCorrect, total: score.bestTotal }) ? (score.updatedAt ?? 0) : null;
+}
+
+// "board" missions are met automatically once any of the player's checks reaches the required number correct.
+export const boardMissionMet = (roleKey, score) => boardMetAt(roleKey, score) !== null;
+
+// ── Team victory ──────────────────────────────────────────────────────────────
+// A team's goals are the win conditions of the players holding a role on that side. The Admiralty and the League each win by
+// completing TEAM_THRESHOLD of theirs; the first to get there wins at once. The Free Traders win if the game ends with neither
+// of them having done so. A completion is timed by when the player SUBMITTED the claim (not when it was reviewed), so a late
+// review can't push a team's finish past the end of the game.
+export const TEAM_THRESHOLD = 0.65;
+export const CONTENDERS = ["empire", "rebellion"]; // the sides that win by reaching the threshold
+
+// When a player's mission was completed (ms), or null if it isn't (or they have no mission).
+export function missionDoneAt(userId, u, claims, scores) {
+  const win = winOf(u?.narrativeRole);
+  if (!win) return null;
+  if (win.type === "board") return boardMetAt(u.narrativeRole, scores?.[userId]);
+  const approved = Object.values(claims || {}).filter(c => c && c.claimantId === userId && c.status === "approved");
+  return approved.length ? Math.min(...approved.map(c => c.createdAt || 0)) : null;
 }
 
 // How many missions are complete across the crew. A count only: naming who would hint at who holds a role.
 export function completedMissionCount(users, claims, scores) {
-  return Object.entries(users || {}).filter(([id, u]) => {
-    const win = winOf(u?.narrativeRole);
-    if (!win) return false;
-    return win.type === "board" ? boardMissionMet(u.narrativeRole, scores?.[id]) : missionStatus(id, claims).state === "approved";
-  }).length;
+  return Object.entries(users || {}).filter(([id, u]) => missionDoneAt(id, u, claims, scores) !== null).length;
+}
+
+export function teamThreshold(settings) {
+  const t = Number(settings?.threshold);
+  return t > 0 && t <= 1 ? t : TEAM_THRESHOLD;
+}
+
+// When the game ends: the scheduled time or the moment the organiser ended it, whichever is sooner. Null if neither is set.
+export function gameEndTime(settings) {
+  const times = [settings?.endsAt, settings?.endedAt].filter(t => Number.isFinite(t) && t > 0);
+  return times.length ? Math.min(...times) : null;
+}
+
+// Each team's progress. `cutoff` ignores completions after the game ended.
+export function teamStandings(users, claims, scores, threshold = TEAM_THRESHOLD, cutoff = Infinity) {
+  const teams = Object.fromEntries(Object.keys(NARRATIVE_FACTIONS).map(f => [f, { members: 0, times: [] }]));
+  for (const [id, u] of Object.entries(users || {})) {
+    const role = NARRATIVE_ROLES[u?.narrativeRole];
+    if (!role) continue;
+    teams[role.faction].members++;
+    const at = missionDoneAt(id, u, claims, scores);
+    if (at !== null && at <= cutoff) teams[role.faction].times.push(at);
+  }
+  for (const t of Object.values(teams)) {
+    t.times.sort((a, b) => a - b);
+    t.done = t.times.length;
+    t.share = t.members ? t.done / t.members : null;
+    // the small allowance stops a product just above a whole number (14% of 50 is 7.000000000000001) demanding one more person
+    t.needed = t.members ? Math.max(1, Math.ceil(threshold * t.members - 1e-9)) : 0;
+    t.crossedAt = t.members && t.done >= t.needed ? t.times[t.needed - 1] : null;
+  }
+  return teams;
+}
+
+// Where the game stands. phase: "open", "won" (winner set) or "ended" (over with nobody to win it).
+export function teamOutcome({ users, claims, scores, settings, now = Date.now() }) {
+  const threshold = teamThreshold(settings);
+  const endTime = gameEndTime(settings);
+  const ended = endTime !== null && now >= endTime;
+  const standings = teamStandings(users, claims, scores, threshold, ended ? endTime : Infinity);
+  const base = { threshold, endTime, ended, standings };
+
+  const crossed = CONTENDERS.filter(f => standings[f].crossedAt !== null)
+    .sort((a, b) => standings[a].crossedAt - standings[b].crossedAt || (standings[b].share - standings[a].share));
+  if (crossed.length) return { ...base, phase: "won", winner: crossed[0], reason: "threshold", decidedAt: standings[crossed[0]].crossedAt, gameOver: true };
+  if (ended) {
+    return standings.independent.members > 0
+      ? { ...base, phase: "won", winner: "independent", reason: "time", decidedAt: endTime, gameOver: true }
+      : { ...base, phase: "ended", winner: null, reason: "nobody", decidedAt: endTime, gameOver: true };
+  }
+  return { ...base, phase: "open", winner: null, reason: null, decidedAt: null, gameOver: false };
 }
 
 export const MAX_PROOF_FILE = 15 * 1024 * 1024;
@@ -1009,9 +1079,10 @@ export async function prepareProofPhoto(file, compress = compressImage) {
 // Saves a claim. The photo goes in its own document (loaded only when someone opens it, so the shared claim list stays
 // small) and is written first, so a reviewer never sees a claim without its photo. The claim keeps a snapshot of what was
 // asked of the player, so reviewing it doesn't change if the crew does.
-export async function submitMissionClaim({ claimantId, roleKey, picks, note, photo, users, claims }) {
+export async function submitMissionClaim({ claimantId, roleKey, picks, note, photo, users, claims, gameOver = false }) {
   const win = resolveWin(roleKey, peopleOf(users), claimantId);
   if (!win || win.type === "board") throw new Error("Your mission doesn't use claims.");
+  if (gameOver) throw new Error("The game is over, so no more claims can be sent.");
   if (!photo) throw new Error("Add a proof photo first.");
   if (!Array.isArray(picks) || picks.length !== win.slots.length || picks.some(p => !p) || new Set(picks).size !== picks.length || picks.includes(claimantId)) {
     throw new Error("Pick a different crew member for each part of your mission.");
@@ -2144,10 +2215,13 @@ export default function App(){
   const [itinMeta,    setItinMeta]    = useState({});
   const [suspectScores, setSuspectScores] = useState({});
   const [missionClaims, setMissionClaims] = useState({});
+  const [teamSettings, setTeamSettings] = useState({});
   const [view,      setView]      = useState("login");
   const [toast,    setToast]    = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const showToast = useCallback(msg=>setToast(msg),[]);
+  const now = useNow(30000);
+  const outcome = teamOutcome({users, claims:missionClaims, scores:suspectScores, settings:teamSettings, now});
 
   useEffect(()=>onAuthStateChanged(auth, async user=>{
     setAuthUser(user??null);
@@ -2185,7 +2259,7 @@ export default function App(){
       subCol("itinerary",  setItinerary),
       subCol("suspectScores", setSuspectScores),
       subCol("missionClaims", setMissionClaims),
-      subCol("settings",   d=>{setCostSettings(d?.costCalc||{});setItinMeta(d?.itinMeta||{});}),
+      subCol("settings",   d=>{setCostSettings(d?.costCalc||{});setItinMeta(d?.itinMeta||{});setTeamSettings(d?.teamVictory||{});}),
       onSnapshot(collection(db,"notifications"), s=>{
         // Listen for new notifications and show in-app toast for current user.
         // The first snapshot is the existing history — only toast for notifications that arrive afterwards.
@@ -2339,7 +2413,7 @@ export default function App(){
   // Sends a win-condition claim with its proof photo for the organiser to review
   const doSubmitMissionClaim = async ({picks, note, photo}) => {
     try{
-      await submitMissionClaim({claimantId:authUser.uid, roleKey:users[authUser.uid]?.narrativeRole||profile?.narrativeRole, picks, note, photo, users, claims:missionClaims});
+      await submitMissionClaim({claimantId:authUser.uid, roleKey:users[authUser.uid]?.narrativeRole||profile?.narrativeRole, picks, note, photo, users, claims:missionClaims, gameOver:outcome.gameOver});
       showToast("📸 Claim sent for review!");
       return true;
     }catch(e){ showToast(`⚠️ ${e.message||"Couldn't send your claim."}`); return false; }
@@ -2358,6 +2432,12 @@ export default function App(){
   const doForgiveClaimAttempt = async (claim) => {
     try{ await forgiveClaimAttempt(claim); showToast("Attempt given back."); return true; }
     catch(e){ showToast(`⚠️ ${e.message||"Couldn't give that attempt back."}`); return false; }
+  };
+
+  // Engine Room: team-victory threshold, end time, and ending or reopening the game
+  const doSaveTeamSettings = async (patch) => {
+    try{ await fsSet("settings","teamVictory",patch); showToast("🏆 Team victory settings saved."); return true; }
+    catch(e){ showToast(`⚠️ ${e.message||"Couldn't save the team victory settings."}`); return false; }
   };
 
   // Engine Room: replay the welcome tour for everyone
@@ -2392,7 +2472,7 @@ export default function App(){
     doSaveFood,doDelFood,doSaveSupply,doDelSupply,
     doSaveMenuItem,doDelMenuItem,doClaimSlot,doUnclaimSlot,doInitDeckHands,
     doSaveReceipt,doDelReceipt,
-    doSaveItinDay,doDelItinDay,doSaveDeckSlot,doDelDeckSlot,doSetDeposit,doSetRank,doSendNotification,doSaveCostSettings,costSettings,doSaveItinMeta,itinMeta,doAssignNarrativeRole,suspectScores,doRecordSuspectCheck,missionClaims,doSubmitMissionClaim,doReviewMissionClaim,doForgiveClaimAttempt,doResetOnboarding,
+    doSaveItinDay,doDelItinDay,doSaveDeckSlot,doDelDeckSlot,doSetDeposit,doSetRank,doSendNotification,doSaveCostSettings,costSettings,doSaveItinMeta,itinMeta,doAssignNarrativeRole,suspectScores,doRecordSuspectCheck,missionClaims,doSubmitMissionClaim,doReviewMissionClaim,doForgiveClaimAttempt,teamOutcome:outcome,teamSettings,doSaveTeamSettings,doResetOnboarding,
     notifPerm,notifSupported,requestPermission};
 
   return <>
@@ -2708,6 +2788,7 @@ function Shell({ctx}){
 
     <OnboardingModal ctx={ctx}/>
     <CrewAssistant ctx={ctx}/>
+    <VictoryBanner outcome={ctx.teamOutcome}/>
     <main style={{flex:1,maxWidth:960,margin:"0 auto",width:"100%",padding:"24px 16px"}}>
       {view==="dashboard"  &&<Dashboard ctx={ctx}/>}
       {view==="itinerary"  &&<Itinerary ctx={ctx}/>}
@@ -4906,7 +4987,7 @@ export function EngineRoom({ctx}){
     <div className="cc-fade">
       <SectionTitle sub="Manage itinerary days and deck hand duties">Engine Room</SectionTitle>
       <div style={{display:"flex",gap:8,marginBottom:22,flexWrap:"wrap"}}>
-        {[["itinerary","🗓 Itinerary Days"],["deckslots","⚙️ Deck Hand Slots"],["deposits","💰 Deposits"],["ranks","⚓ Crew Ranks"],["notify","📨 Notify"],["costs","🧮 Cost Calculator"],["bgg","📚 BGG Index"],["narrative","🎭 Narrative Roles"],["claims",`📸 Mission Claims${waitingClaims?` (${waitingClaims})`:""}`],["tour","👋 Welcome Tour"]].map(([id,label])=>(
+        {[["itinerary","🗓 Itinerary Days"],["deckslots","⚙️ Deck Hand Slots"],["deposits","💰 Deposits"],["ranks","⚓ Crew Ranks"],["notify","📨 Notify"],["costs","🧮 Cost Calculator"],["bgg","📚 BGG Index"],["narrative","🎭 Narrative Roles"],["claims",`📸 Mission Claims${waitingClaims?` (${waitingClaims})`:""}`],["victory","🏆 Team Victory"],["tour","👋 Welcome Tour"]].map(([id,label])=>(
           <button key={id} onClick={()=>setTab(id)} style={{fontFamily:"'Cinzel',serif",fontSize:12,fontWeight:700,padding:"7px 16px",borderRadius:5,cursor:"pointer",border:`2px solid ${tab===id?T.amber:T.border}`,background:tab===id?T.amberSoft:"transparent",color:tab===id?T.amber:T.muted,transition:"all .15s"}}>{label}</button>
         ))}
       </div>
@@ -4919,6 +5000,7 @@ export function EngineRoom({ctx}){
       {tab==="bgg"&&<BggIndexManager ctx={ctx}/>}
       {tab==="narrative"&&<NarrativeManager ctx={ctx}/>}
       {tab==="claims"&&<ClaimsReview ctx={ctx}/>}
+      {tab==="victory"&&<TeamVictoryManager ctx={ctx}/>}
       {tab==="tour"&&<WelcomeTourManager ctx={ctx}/>}
     </div>
   );
@@ -5054,6 +5136,158 @@ export function ClaimsReview({ctx}){
         })}
       </div>
     </>}
+  </div>;
+}
+
+// ── Team victory UI ───────────────────────────────────────────────────────────
+// Re-renders on a timer so a scheduled game end takes effect without a reload.
+function useNow(intervalMs){
+  const [now,setNow]=useState(()=>Date.now());
+  useEffect(()=>{ const t=setInterval(()=>setNow(Date.now()),intervalMs); return()=>clearInterval(t); },[intervalMs]);
+  return now;
+}
+
+const pctOf=x=>Math.round(100*x);
+const whenText=ts=>ts?new Date(ts).toLocaleString("en-CA",{weekday:"short",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}):"";
+const toLocalInput=ms=>{
+  if(!ms) return "";
+  const d=new Date(ms), p=n=>String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+
+// What the result says, in words. Null while the game is still open.
+export function victoryText(outcome){
+  if(!outcome||outcome.phase==="open") return null;
+  const pct=pctOf(outcome.threshold);
+  if(outcome.winner===null) return `The game is over. Nobody reached ${pct}% and no Free Traders were in play.`;
+  const name=NARRATIVE_FACTIONS[outcome.winner].name;
+  return outcome.reason==="threshold"
+    ?`🏆 ${name} have won! They completed at least ${pct}% of their team's goals.`
+    :`🏆 ${name} win! Neither the Admiralty nor the League reached ${pct}% in time.`;
+}
+
+// Everyone sees each side's percentage but never the numbers behind it: counts would give away how big each side is.
+export function TeamStandings({outcome}){
+  const {standings,threshold,endTime,ended}=outcome;
+  const need=pctOf(threshold);
+  const bar=f=>{
+    const t=standings[f], fac=NARRATIVE_FACTIONS[f], share=t.share;
+    const shown=share===null?0:Math.min(100,pctOf(share));
+    return <div key={f} style={{marginBottom:12}}>
+      <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:5}}>
+        <span style={{color:fac.color,fontWeight:700}}>{fac.icon} {fac.name}</span>
+        <span style={{color:T.text,fontFamily:"'Cinzel',serif",fontWeight:700}}>{share===null?"—":`${pctOf(share)}%`}</span>
+      </div>
+      <div role="progressbar" aria-label={`${fac.name} progress`} aria-valuenow={shown} aria-valuemin={0} aria-valuemax={100}
+        style={{position:"relative",height:10,borderRadius:5,background:T.surface2}}>
+        <div style={{width:`${shown}%`,height:"100%",borderRadius:5,background:fac.color}}/>
+        <div title={`${need}% to win`} style={{position:"absolute",left:`${need}%`,top:-3,bottom:-3,width:2,background:T.text}}/>
+      </div>
+    </div>;
+  };
+  const verdict=victoryText(outcome);
+  return <Card style={{marginBottom:14,border:`1.5px solid ${T.border2}`}}>
+    <div style={{fontSize:11,fontWeight:700,color:T.amber,textTransform:"uppercase",letterSpacing:".08em",fontFamily:"'Cinzel',serif",marginBottom:8}}>
+      🏆 Team Victory
+    </div>
+    <p style={{fontSize:12,color:T.muted,lineHeight:1.6,margin:"0 0 12px"}}>
+      The Admiralty and the League each win by completing {need}% of their team's goals. The first to get there wins.
+    </p>
+    {CONTENDERS.map(bar)}
+    <p style={{fontSize:12,color:T.hint,lineHeight:1.6,margin:"4px 0 0"}}>
+      The Free Traders win if the game ends with neither side at {need}%.
+    </p>
+    {endTime&&<div style={{fontSize:11,color:T.hint,marginTop:8}}>{ended?"The game ended":"The game ends"} {whenText(endTime)}</div>}
+    {verdict&&<div role="status" style={{marginTop:12,padding:"10px 14px",borderRadius:6,textAlign:"center",fontFamily:"'Cinzel',serif",
+      fontSize:13,fontWeight:700,color:T.amber,background:T.bgMid,border:`1.5px solid ${T.amber}55`}}>{verdict}</div>}
+  </Card>;
+}
+
+// Shown on every page once the game has been decided.
+export function VictoryBanner({outcome}){
+  const text=victoryText(outcome);
+  if(!text) return null;
+  const fac=outcome.winner?NARRATIVE_FACTIONS[outcome.winner]:null;
+  return <div role="status" aria-label="Game result" style={{margin:"0 auto",maxWidth:960,width:"100%",boxSizing:"border-box",padding:"10px 16px",
+    textAlign:"center",fontFamily:"'Cinzel',serif",fontSize:13,fontWeight:700,color:fac?.color||T.amber,
+    background:fac?.bg||T.bgMid,borderBottom:`2px solid ${fac?.border||T.border2}`,zIndex:1,position:"relative"}}>
+    {text}
+  </div>;
+}
+
+// Engine Room: set the threshold and end time, end or reopen the game, and see the real numbers.
+export function TeamVictoryManager({ctx}){
+  const {teamOutcome:o,teamSettings:settings,doSaveTeamSettings}=ctx;
+  const [pct,setPct]=useState(String(pctOf(teamThreshold(settings))));
+  const [endsAt,setEndsAt]=useState(toLocalInput(settings?.endsAt));
+  const [confirmEnd,setConfirmEnd]=useState(false);
+  const [busy,setBusy]=useState(false);
+
+  const n=Number(pct);
+  const pctOk=pct!==""&&Number.isFinite(n)&&n>=1&&n<=100;
+  const run=async patch=>{ setBusy(true); await doSaveTeamSettings(patch); setBusy(false); };
+  const save=()=>{
+    if(!pctOk) return;
+    const ms=endsAt?new Date(endsAt).getTime():null;
+    return run({threshold:n/100,endsAt:Number.isFinite(ms)?ms:null});
+  };
+  const endNow=async()=>{ await run({endedAt:Date.now()}); setConfirmEnd(false); };
+  const reopen=async()=>{ await run({endedAt:null,endsAt:null}); setEndsAt(""); };
+
+  const row=f=>{
+    const t=o.standings[f], fac=NARRATIVE_FACTIONS[f];
+    return <div key={f} style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap",fontSize:13,padding:"7px 10px",
+      background:T.bgMid,borderRadius:6,border:`1px solid ${fac.border}`}}>
+      <span style={{color:fac.color,fontWeight:700}}>{fac.icon} {fac.name}</span>
+      <span style={{color:T.text}}>
+        {t.members===0?"no one in play":`${t.done} of ${t.members} complete (${pctOf(t.share)}%)${CONTENDERS.includes(f)?` — needs ${t.needed}`:""}`}
+      </span>
+    </div>;
+  };
+  const verdict=victoryText(o);
+  const inputStyle={fontFamily:"inherit",fontSize:13,padding:"7px 10px",borderRadius:5,background:T.surface2,color:T.text,border:`1.5px solid ${T.border2}`};
+
+  return <div>
+    <h3 style={{fontFamily:"'Cinzel',serif",fontSize:14,color:T.amber,margin:"0 0 10px"}}>🏆 Team Victory</h3>
+    <p style={{fontSize:12,color:T.muted,marginBottom:16,lineHeight:1.6}}>
+      The Admiralty and the League each win by completing the threshold share of their team's goals (the first to get there wins at once).
+      The Free Traders win if the game ends with neither side there, so set an end time or end the game yourself. Once the game is decided,
+      players can't send new claims. Players see each side's percentage only, never these numbers.
+    </p>
+
+    <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>{Object.keys(NARRATIVE_FACTIONS).map(row)}</div>
+
+    <div role="status" style={{fontSize:13,marginBottom:16,color:verdict?T.amber:T.muted,fontWeight:verdict?700:400}}>
+      {verdict||(o.endTime?`The game is open and ends ${whenText(o.endTime)}`:"The game is open, with no end time set. It stays open until you end it.")}
+    </div>
+
+    <Card style={{background:T.bgMid}}>
+      <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"flex-end"}}>
+        <label style={{fontSize:11,fontWeight:600,color:T.muted,textTransform:"uppercase",letterSpacing:".06em"}}>
+          Victory threshold (%)
+          <input aria-label="Victory threshold (%)" type="number" min="1" max="100" value={pct} onChange={e=>setPct(e.target.value)}
+            style={{...inputStyle,display:"block",marginTop:4,width:110}}/>
+        </label>
+        <label style={{fontSize:11,fontWeight:600,color:T.muted,textTransform:"uppercase",letterSpacing:".06em"}}>
+          Game ends at
+          <input aria-label="Game ends at" type="datetime-local" value={endsAt} onChange={e=>setEndsAt(e.target.value)}
+            style={{...inputStyle,display:"block",marginTop:4}}/>
+        </label>
+        <Btn size="sm" disabled={!pctOk||busy} onClick={save}>Save</Btn>
+      </div>
+      {!pctOk&&<div style={{fontSize:11,color:T.danger,marginTop:8}}>Enter a threshold between 1 and 100.</div>}
+
+      <div style={{borderTop:`1px solid ${T.border}`,marginTop:16,paddingTop:14,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+        {!confirmEnd
+          ?<Btn size="sm" variant="danger" disabled={busy||o.ended} onClick={()=>setConfirmEnd(true)}>End the game now</Btn>
+          :<div role="alertdialog" aria-label="Confirm end" style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+            <span style={{fontSize:12,color:T.text}}>End the game for everyone?</span>
+            <Btn size="sm" variant="danger" disabled={busy} onClick={endNow}>Yes, end it</Btn>
+            <Btn size="sm" variant="ghost" disabled={busy} onClick={()=>setConfirmEnd(false)}>Cancel</Btn>
+          </div>}
+        {(o.ended||settings?.endedAt||settings?.endsAt)&&<Btn size="sm" variant="ghost" disabled={busy} onClick={reopen}>Reopen the game</Btn>}
+      </div>
+    </Card>
   </div>;
 }
 
@@ -5224,7 +5458,7 @@ export function nextSuspectScore(prev, result, now = Date.now()) {
   const old = prev && typeof prev === "object" ? prev : {};
   const oldHistory = Array.isArray(old.history) ? old.history.filter(isCheckResult) : [];
   const checks = (Number.isInteger(old.checks) && old.checks >= oldHistory.length ? old.checks : oldHistory.length) + 1;
-  const history = [...oldHistory, { correct: result.correct, total: result.total }].slice(-MAX_SCORE_HISTORY);
+  const history = [...oldHistory, { correct: result.correct, total: result.total, at: now }].slice(-MAX_SCORE_HISTORY);
   const oldBest = isCheckResult({ correct: old.bestCorrect, total: old.bestTotal }) ? { correct: old.bestCorrect, total: old.bestTotal } : null;
   const ratio = r => r.total > 0 ? r.correct / r.total : 0;
   const beatsOld = !oldBest || ratio(result) > ratio(oldBest) || (ratio(result) === ratio(oldBest) && result.correct > oldBest.correct);
@@ -5417,7 +5651,7 @@ function ProofPhotoPicker({photo,onPhoto,compress,hint}){
 }
 
 // ── Mission card (win condition + claim with photo proof) ─────────────────────
-export function MissionCard({roleKey,uid,users,claims,scores,onSubmit,compress,fac}){
+export function MissionCard({roleKey,uid,users,claims,scores,onSubmit,compress,fac,gameOver}){
   const win=resolveWin(roleKey,peopleOf(users),uid);
   const [picks,setPicks]=useState([]);
   const [note,setNote]=useState("");
@@ -5469,12 +5703,12 @@ export function MissionCard({roleKey,uid,users,claims,scores,onSubmit,compress,f
     body=<>
       {status.state==="rejected"&&<div role="status" style={{marginBottom:12,padding:"9px 12px",borderRadius:6,fontSize:12,lineHeight:1.5,
         color:T.danger,background:T.dangerBg,border:`1px solid ${T.danger}44`}}>
-        Your last claim wasn't approved.{status.claim.reviewNote?` Organiser's note: ${status.claim.reviewNote}`:""}{left>0?" You can send a new one.":""}
+        Your last claim wasn't approved.{status.claim.reviewNote?` Organiser's note: ${status.claim.reviewNote}`:""}{left>0&&!gameOver?" You can send a new one.":""}
       </div>}
-      {left===0
+      {gameOver||left===0
         ?<div role="status" style={{padding:"10px 14px",borderRadius:6,fontSize:12,lineHeight:1.5,textAlign:"center",
           color:T.danger,background:T.dangerBg,border:`1px solid ${T.danger}44`}}>
-          You've used all {MAX_CLAIM_ATTEMPTS} of your attempts. If you think a claim was turned down unfairly, ask the organiser.
+          {gameOver?"The game is over, so no more claims can be sent.":<>You've used all {MAX_CLAIM_ATTEMPTS} of your attempts. If you think a claim was turned down unfairly, ask the organiser.</>}
         </div>
         :<>
           <div style={{fontSize:12,color:T.muted,marginBottom:6,lineHeight:1.6}}>
@@ -5521,7 +5755,7 @@ export function MissionCard({roleKey,uid,users,claims,scores,onSubmit,compress,f
 
 // ── Narrative Dossier (player view) ──────────────────────────────────────────
 export function NarrativeDossier({ctx}){
-  const {profile,authUser,users,suspectScores,doRecordSuspectCheck,missionClaims,doSubmitMissionClaim,proofCompress}=ctx;
+  const {profile,authUser,users,suspectScores,doRecordSuspectCheck,missionClaims,doSubmitMissionClaim,proofCompress,teamOutcome:outcome}=ctx;
   // Read the live user doc: `profile` is loaded once at sign-in, so it would miss a role assigned afterwards
   const me=(authUser&&users?.[authUser.uid])||profile;
   const roleKey=me?.narrativeRole;
@@ -5609,7 +5843,10 @@ export function NarrativeDossier({ctx}){
 
         {/* Win condition and claim */}
         {authUser&&<MissionCard roleKey={roleKey} uid={authUser.uid} users={users} claims={missionClaims} scores={suspectScores}
-          onSubmit={doSubmitMissionClaim} compress={proofCompress} fac={fac}/>}
+          onSubmit={doSubmitMissionClaim} compress={proofCompress} fac={fac} gameOver={outcome?.gameOver}/>}
+
+        {/* How each side is doing */}
+        {outcome&&<TeamStandings outcome={outcome}/>}
 
         {/* Field intelligence note */}
         <Card style={{border:`1.5px solid ${T.amber}44`,background:T.bgMid}}>
