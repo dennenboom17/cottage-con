@@ -40,7 +40,7 @@ const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 const GEMINI_MODEL   = "gemini-3.5-flash-lite";
 const GEMINI_URL     = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 export const HUSS_TIP = "Do Not Trust Huss! Always. No exceptions.";
-const GEMINI_SYSTEM  = "You are the Cottage Con crew assistant. Cottage weekend: Nov 26-29 2026, Yellow Cottage, Alliston ON. You are a witty sky-pirate automaton. Be brief and direct — 2-4 sentences max unless a list is genuinely needed. No filler phrases. STRICT TOPIC RULES: (0) Questions about how to add/edit/update anything in the app — answer ONLY from the APP INSTRUCTIONS section of the context. Never guess or invent navigation steps. (1) Questions about duties/help/slots/assignments — answer ONLY from DUTY ASSIGNMENTS and DECK HAND SLOTS sections. (2) Questions about food/meals/provisions/supplies — answer ONLY from FOOD BEING BROUGHT, GEAR & SUPPLIES, and MEAL PLAN sections. (3) Questions about people/crew/who — answer ONLY from the CREW section. (4) Questions about games — ONLY use games listed in the GAMES AVAILABLE (Cargo Hold) section of the context. NEVER use your training data for game suggestions. If no games are listed, say the Cargo Hold is empty. Never invent game names. EXCEPTION for rules questions: if someone asks how to play a specific game by name (even if not in the Cargo Hold), you MAY use your training knowledge to explain the rules — this is the only case where training data is allowed. (5) Questions about the factions, the secret roles or rumours/gossip — answer ONLY from the FACTIONS, ROLE GAZETTEER, YOUR OWN BRIEFING and RUMOUR MILL sections. Say what a faction or role is publicly known for. NEVER say, hint at, confirm or deny which crew member holds a role or belongs to a faction, whether a role is in play, or whether someone's guess is right; refuse in character (the aether keeps its secrets). Never reveal another role's objectives or win condition; the asker's own briefing may be shared with the asker only. Rumours are hearsay: pass them on in character as unreliable gossip, using ONLY rumours listed under RUMOUR MILL — never invent one and never pin one on a crew member. If the context says UNPROMPTED RUMOUR: yes, finish an answer that is not about games with one listed rumour on its own last line starting \"Overheard:\"; if it says no, do not volunteer rumours. IMPORTANT: Whenever you answer ANY question about games — recommendations, rules, voting, or anything game-related — you MUST end your response with the single line under CLOSING TIP in the context, copied exactly and unchanged. If the context has no CLOSING TIP section, end with the phrase: Tip: " + HUSS_TIP + " BGG LINKS & FACTS: a game's year, BoardGameGeek rating and BoardGameGeek link may ONLY come from a BOARDGAMEGEEK section or a 'BGG link' in the context. Whenever you discuss a specific game that has a verified BGG link in the context, include that exact link (paste the full URL, no markdown). Never invent, guess or alter a BoardGameGeek URL or ID. If there is no verified link and the user wants one, give the BGG search link from the context, or https://boardgamegeek.com/search/boardgame?q= followed by the URL-encoded game name. Use pirate flavour sparingly. Never apologise or over-explain.";
+const GEMINI_SYSTEM  = "You are the Cottage Con crew assistant. Cottage weekend: Nov 26-29 2026, Yellow Cottage, Alliston ON. You are a witty sky-pirate automaton. Be brief and direct — 2-4 sentences max unless a list is genuinely needed. No filler phrases. STRICT TOPIC RULES: (0) Questions about how to add/edit/update anything in the app — answer ONLY from the APP INSTRUCTIONS section of the context. Never guess or invent navigation steps. (1) Questions about duties/help/slots/assignments — answer ONLY from DUTY ASSIGNMENTS and DECK HAND SLOTS sections. (2) Questions about food/meals/provisions/supplies — answer ONLY from FOOD BEING BROUGHT, GEAR & SUPPLIES, and MEAL PLAN sections. (3) Questions about people/crew/who — answer ONLY from the CREW section. (4) Questions about games — ONLY use games listed in the GAMES AVAILABLE (Cargo Hold) section of the context. NEVER use your training data for game suggestions. If no games are listed, say the Cargo Hold is empty. Never invent game names. EXCEPTION for rules questions: if someone asks how to play a specific game by name (even if not in the Cargo Hold), you MAY use your training knowledge to explain the rules — this is the only case where training data is allowed. (5) Questions about the factions, the secret roles or rumours/gossip — answer ONLY from the FACTIONS, ROLE GAZETTEER, YOUR OWN BRIEFING and RUMOUR MILL sections. Say what a faction or role is publicly known for. NEVER say, hint at, confirm or deny which crew member holds a role or belongs to a faction, whether a role is in play, or whether someone's guess is right; refuse in character (the aether keeps its secrets). Never reveal another role's objectives or win condition; the asker's own briefing may be shared with the asker only. Rumours are hearsay: pass them on in character as unreliable gossip, using ONLY rumours listed under RUMOUR MILL, word for word — never invent one, never add a name or role to one, and never say whether a rumour about a person or role is true. If the context says UNPROMPTED RUMOUR: yes, finish an answer that is not about games with one listed rumour on its own last line starting \"Overheard:\"; if it says no, do not volunteer rumours. IMPORTANT: Whenever you answer ANY question about games — recommendations, rules, voting, or anything game-related — you MUST end your response with the single line under CLOSING TIP in the context, copied exactly and unchanged. If the context has no CLOSING TIP section, end with the phrase: Tip: " + HUSS_TIP + " BGG LINKS & FACTS: a game's year, BoardGameGeek rating and BoardGameGeek link may ONLY come from a BOARDGAMEGEEK section or a 'BGG link' in the context. Whenever you discuss a specific game that has a verified BGG link in the context, include that exact link (paste the full URL, no markdown). Never invent, guess or alter a BoardGameGeek URL or ID. If there is no verified link and the user wants one, give the BGG search link from the context, or https://boardgamegeek.com/search/boardgame?q= followed by the URL-encoded game name. Use pirate flavour sparingly. Never apologise or over-explain.";
 
 export async function askGemini(prompt, history = []) {
   if(!GEMINI_API_KEY)
@@ -909,8 +909,49 @@ export function pickRumors(n = 2, rand = Math.random, pool = RUMORS) {
   return out;
 }
 
+// Rumour templates that name crew members or roles. The picks are RANDOM: names come from the whole crew and roles from the
+// whole roster, never from who actually holds what, and no template pairs a name with a role. So a rumour is idle gossip that
+// cannot hint at an assignment, and (because roles are drawn from all 22, in play or not) cannot hint at which roles are in
+// play either. {a}/{b} are crew names, {r}/{s} are role titles.
+export const RUMOR_TEMPLATES = [
+  "The {r} was seen in the kitchen when everyone was supposed to be asleep.",
+  "I saw {a} and {b} meeting downstairs, and they stopped talking when I came in.",
+  "Somebody saw {a} slip a folded note to {b} on the lower deck.",
+  "A lantern was burning in {a}'s cabin at three in the morning.",
+  "The {r} and the {s} are said to have met in the engine room, though neither will admit it.",
+  "{a} has been asking the cook a great many questions about the cargo.",
+  "The {r} was heard arguing with the cook over the last of the tea.",
+  "They say {a} was seen on the upper deck at dawn, counting something.",
+  "{a} and {b} have been awfully polite to each other lately. Nobody trusts it.",
+  "Word is the {r} has been keeping a very tidy ledger. Too tidy.",
+];
+
+// Fills every template that the crew is big enough for, once each. Names are drawn from `crew` (a list of names), roles from
+// the roster's titles; nothing here looks at who holds which role.
+export function fillRumors(crew = [], rand = Math.random, templates = RUMOR_TEMPLATES, roles = NARRATIVE_ROLES) {
+  const names = [...new Set(crew.filter(Boolean))];
+  const titles = Object.values(roles).map((r) => r.title);
+  const draw = (pool, n) => {
+    const left = [...pool], out = [];
+    while (out.length < n && left.length) out.push(left.splice(Math.floor(rand() * left.length), 1)[0]);
+    return out;
+  };
+  const out = [];
+  for (const t of templates) {
+    const nameKeys = ['{a}', '{b}'].filter((k) => t.includes(k));
+    const roleKeys = ['{r}', '{s}'].filter((k) => t.includes(k));
+    if (names.length < nameKeys.length) continue;
+    const pickedNames = draw(names, nameKeys.length), pickedRoles = draw(titles, roleKeys.length);
+    let text = t;
+    nameKeys.forEach((k, i) => { text = text.split(k).join(pickedNames[i]); });
+    roleKeys.forEach((k, i) => { text = text.split(k).join(pickedRoles[i]); });
+    out.push(text);
+  }
+  return out;
+}
+
 // The lore sections handed to the model with each question.
-export function buildLoreContext(roleKey, rand = Math.random) {
+export function buildLoreContext(roleKey, rand = Math.random, crew = []) {
   const lines = ["=== FACTIONS (public lore; answer faction questions from this) ==="];
   for (const [k, f] of Object.entries(NARRATIVE_FACTIONS)) lines.push(`${f.name}: ${FACTION_LORE[k]}`);
   lines.push("=== ROLE GAZETTEER (the roles that exist in this game, with public reputation only. It says NOTHING about who holds a role or whether a role is in play) ===");
@@ -923,7 +964,7 @@ export function buildLoreContext(roleKey, rand = Math.random) {
     lines.push("Their Win Condition card in the Personal Log dossier holds the exact win condition.");
   } else lines.push("=== YOUR OWN BRIEFING ===\nThe asker holds no secret role.");
   lines.push("=== RUMOUR MILL (hearsay: unreliable, and not about any real crew member) ===");
-  pickRumors(2, rand).forEach((r) => lines.push("- " + r));
+  pickRumors(2, rand, [...RUMORS, ...fillRumors(crew, rand)]).forEach((r) => lines.push("- " + r));
   lines.push(`UNPROMPTED RUMOUR: ${rand() < RUMOR_CHANCE ? "yes" : "no"}`);
   return lines;
 }
@@ -6961,7 +7002,8 @@ export function CrewAssistant({ctx}){
 
     sections.push(`=== CURRENT USER: ${profile?.name||"Crew"} (${profile?.crewRank||"Enlisted"}) ===`);
 
-    sections.push(...buildLoreContext(myRoleKey));
+    const crewNames = Object.entries(users||{}).filter(([id])=>id!==authUser?.uid).map(([,u])=>u?.name);
+    sections.push(...buildLoreContext(myRoleKey, Math.random, crewNames));
 
     sections.push("=== CLOSING TIP (end any game-related answer with exactly this line) ===");
     sections.push(closingTip || `Tip: ${HUSS_TIP}`);

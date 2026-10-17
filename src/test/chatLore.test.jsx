@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { getDoc } from 'firebase/firestore'
 import {
   CrewAssistant, NARRATIVE_ROLES, NARRATIVE_FACTIONS, FACTION_LORE, ROLE_LORE, RUMORS, RUMOR_CHANCE,
-  pickRumors, buildLoreContext, resetBggMatcher,
+  RUMOR_TEMPLATES, pickRumors, fillRumors, buildLoreContext, resetBggMatcher,
 } from '../App.jsx'
 
 const sectionOf = (text, name) => text.split(/\n(?==== )/).find((p) => p.startsWith(`=== ${name}`)) || ''
@@ -59,6 +59,66 @@ describe('pickRumors', () => {
   })
 })
 
+describe('fillRumors', () => {
+  const crew = ['Ann', 'Ben', 'Cora', 'Dev']
+  const titles = Object.values(NARRATIVE_ROLES).map((r) => r.title)
+  // mulberry32: small, deterministic and well mixed even for neighbouring seeds
+  const seeded = (seed) => () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 }
+
+  it('fills every template, naming only crew members and roles from the roster', () => {
+    const out = fillRumors(crew, seeded(7))
+    expect(out).toHaveLength(RUMOR_TEMPLATES.length)
+    for (const r of out) {
+      expect(r, r).not.toMatch(/[{}]/)
+      const named = crew.filter((n) => r.includes(n))
+      expect(named.length, r).toBeLessThanOrEqual(2)
+    }
+  })
+
+  it('never pairs a name with a role, so a rumour cannot claim who holds what', () => {
+    for (const t of RUMOR_TEMPLATES) expect(/\{[ab]\}/.test(t) && /\{[rs]\}/.test(t), t).toBe(false)
+    for (let seed = 1; seed < 40; seed++) {
+      for (const r of fillRumors(crew, seeded(seed))) {
+        if (crew.some((n) => r.includes(n))) for (const title of titles) expect(r, r).not.toContain(title)
+      }
+    }
+  })
+
+  it('uses two different people when a rumour needs two', () => {
+    const two = ['I saw {a} and {b} meeting downstairs.']
+    for (let seed = 1; seed < 40; seed++) {
+      const [r] = fillRumors(crew, seeded(seed), two)
+      const named = crew.filter((n) => r.includes(n))
+      expect(named, r).toHaveLength(2)
+    }
+  })
+
+  it('draws roles from the whole roster, not just the ones in play', () => {
+    const seen = new Set()
+    for (let seed = 1; seed < 400; seed++) for (const r of fillRumors(crew, seeded(seed), ['The {r} was seen in the kitchen.'])) seen.add(titles.find((t) => r.includes(t)))
+    expect(seen.size).toBeGreaterThan(titles.length - 3)
+  })
+
+  it('skips templates the crew is too small for, and copes with an empty crew', () => {
+    const solo = fillRumors(['Ann'], seeded(3))
+    expect(solo.length).toBeLessThan(RUMOR_TEMPLATES.length)
+    expect(solo.some((r) => r.includes('Ann'))).toBe(true)
+    const none = fillRumors([], seeded(3))
+    expect(none.length).toBeGreaterThan(0)
+    for (const r of none) expect(r).not.toMatch(/[{}]/)
+    expect(fillRumors([null, '', undefined], seeded(3))).toEqual(none)
+  })
+
+  it('knows nothing about assignments: the same draws give the same rumours whoever holds which role', () => {
+    // fillRumors takes only names, so any two crews with the same names get identical rumours
+    expect(fillRumors(crew, seeded(11))).toEqual(fillRumors([...crew], seeded(11)))
+  })
+
+  it('keeps the steampunk voice', () => {
+    for (const t of RUMOR_TEMPLATES) expect(t).not.toMatch(OLD_WORDS)
+  })
+})
+
 describe('buildLoreContext', () => {
   const ctxFor = (role, rand) => buildLoreContext(role, rand).join('\n')
 
@@ -84,6 +144,17 @@ describe('buildLoreContext', () => {
 
   it('says so when the asker has no role', () => {
     expect(sectionOf(ctxFor(null, () => 0), 'YOUR OWN BRIEFING')).toContain('no secret role')
+  })
+
+  it('mixes crew-named rumours into the pool, and never names the asker', () => {
+    const crew = ['Ben', 'Cora']
+    const all = new Set()
+    for (let i = 0; i < 300; i++) {
+      const mill = sectionOf(buildLoreContext(null, () => Math.random(), crew).join('\n'), 'RUMOUR MILL')
+      mill.split('\n').filter((l) => l.startsWith('- ')).forEach((l) => all.add(l.slice(2)))
+    }
+    expect([...all].some((r) => r.includes('Ben') || r.includes('Cora'))).toBe(true)
+    expect([...all].some((r) => !RUMORS.includes(r))).toBe(true)
   })
 
   it('puts two rumours in the rumour mill and decides, from chance, whether to volunteer one', () => {
@@ -145,12 +216,28 @@ describe('the crew assistant and the lore', () => {
     expect(sectionOf(req, 'CREW')).not.toMatch(/arms dealer|gunsmith|informant|narrative/i)
   })
 
+  it('names other crew members in rumours but never the asker', async () => {
+    // 0.999 always takes the last candidate, which puts the asker (listed last) first in line to be named
+    vi.spyOn(Math, 'random').mockReturnValue(0.999)
+    await ask(mkCtx({
+      u2: { id: 'u2', name: 'Benedict' },
+      u3: { id: 'u3', name: 'Cora' },
+      me: { id: 'me', name: 'Ann Lee' },
+    }), 'Any gossip?')
+    const mill = sectionOf(requestText(f), 'RUMOUR MILL')
+    expect(mill).toContain('awfully polite')
+    expect(mill).toContain('Cora')
+    expect(mill).toContain('Benedict')
+    expect(mill).not.toContain('Ann')
+  })
+
   it('tells the model how to treat factions, roles and rumours', async () => {
     await ask(mkCtx({ me: { id: 'me', name: 'Ann Lee' } }), 'Any gossip?')
     const sys = systemText(f)
     expect(sys).toContain('RUMOUR MILL')
     expect(sys).toMatch(/NEVER say, hint at, confirm or deny which crew member holds a role/)
     expect(sys).toMatch(/never invent one/)
+    expect(sys).toMatch(/never add a name or role to one/)
     expect(sys).toContain('UNPROMPTED RUMOUR')
     expect(sys).toContain('Overheard:')
     // the game-tip rule must still be the last word for game answers
@@ -169,7 +256,6 @@ describe('the crew assistant and the lore', () => {
     await vi.waitFor(() => expect(f).toHaveBeenCalledTimes(2))
     const mill = (i) => sectionOf(JSON.parse(f.mock.calls[i][1].body).contents.at(-1).parts[0].text, 'RUMOUR MILL')
     expect(mill(0)).toContain(RUMORS[0])
-    expect(mill(1)).toContain(RUMORS.at(-1))
     expect(mill(0)).not.toEqual(mill(1))
   })
 })
