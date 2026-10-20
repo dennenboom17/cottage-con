@@ -2337,24 +2337,29 @@ export default function App(){
   const [teamSettings, setTeamSettings] = useState({});
   const [view,      setViewState] = useState("login");
   const viewRef = useRef("login"); // the view the page is showing, readable from event listeners
+  const [viewSection, setViewSection] = useState(null); // which section of it to scroll to (see VIEW_SECTIONS)
+  const sectionRef = useRef(null);
   const [toast,    setToast]    = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const showToast = useCallback(msg=>setToast(msg),[]);
   // Pages are mirrored in the URL hash (#/itinerary) so Back, Forward, reload and shared links work. Only the signed-in tabs
   // use the hash; the login and setup screens leave the URL alone. `replace` is for moves the user didn't make (landing after sign-in).
-  const setView = useCallback((next, {replace=false}={})=>{
-    viewRef.current = next;
+  const setView = useCallback((next, {replace=false, section=null}={})=>{
+    const sec = validSection(next, section);
+    viewRef.current = next; sectionRef.current = sec;
     setViewState(next);
-    writeViewHash(next, replace);
+    setViewSection(sec);
+    writeViewHash(next, replace, sec);
   },[]);
   const now = useNow(30000);
   useEffect(()=>{
     const onNav = ()=>{
       if(!TAB_IDS.includes(viewRef.current)) return; // signed out or still setting up: the URL doesn't drive the page
-      const next = landingView();
-      if(next===viewRef.current) return;
-      viewRef.current = next;
+      const {view:next, section} = landingTarget();
+      if(next===viewRef.current && section===sectionRef.current) return;
+      viewRef.current = next; sectionRef.current = section;
       setViewState(next);
+      setViewSection(section);
       setMenuOpen(false);
     };
     window.addEventListener("popstate", onNav);
@@ -2379,7 +2384,7 @@ export default function App(){
         };
         fsSet("users",user.uid,{...data,...loginUpdate});
         setProfile({...data,...loginUpdate});
-        setView(landingView(), {replace:true});
+        { const t = landingTarget(); setView(t.view, {replace:true, section:t.section}); }
 
       } else setView("setup");
     } else { setProfile(null); setView("login"); }
@@ -2428,7 +2433,7 @@ export default function App(){
     await updateProfile(cred.user,{displayName:name});
     const prof={id:cred.user.uid,name,email,dietary,picture:picture||"",crewRank:"Enlisted",createdAt:Date.now(),onboarded:false};
     await setDoc(doc(db,"users",cred.user.uid),prof);
-    setProfile(prof); setView(landingView(), {replace:true});
+    setProfile(prof); { const t = landingTarget(); setView(t.view, {replace:true, section:t.section}); }
     showToast(`All aboard, ${name.split(" ")[0]}! ⚙️`);
   };
   const doLogin  = (email,pw)=>signInWithEmailAndPassword(auth,email,pw);
@@ -2625,7 +2630,7 @@ export default function App(){
 
   if(authUser===undefined) return <><SteampunkBg/><Spinner label="Firing up the engines…"/></>;
 
-  const ctx={authUser,profile,users,games,food,supplies,voyageMenu,deckHands,receipts,itinerary,view,setView,showToast,menuOpen,setMenuOpen,
+  const ctx={authUser,profile,users,games,food,supplies,voyageMenu,deckHands,receipts,itinerary,view,setView,showToast,menuOpen,setMenuOpen,viewSection,
     doLogin,doLogout,doRegister,doUpdateProfile,doLogGamePlayed,doRemoveGamePlayed,
     doSaveGame,doDelGame,doToggleLike,
     doSaveFood,doDelFood,doSaveSupply,doDelSupply,
@@ -2896,17 +2901,30 @@ const TABS=[
 
 export const TAB_IDS = TABS.map(t=>t.id);
 
-// "#/itinerary" → "itinerary" (only for a real tab), anything else → null
-export function viewFromHash(hash){
-  const id = /^#\/?([\w-]+)\/?$/.exec(hash||"")?.[1];
-  return TAB_IDS.includes(id) ? id : null;
+// Sections of a page that can be linked to and scrolled to: "#/deckhands/crew" opens Deck Hands at the crew roster.
+// Each is an element with id "section-<name>" on that page.
+export const VIEW_SECTIONS = { deckhands: ["duties","crew"] };
+export const validSection = (view, section) => (section && (VIEW_SECTIONS[view]||[]).includes(section)) ? section : null;
+const SECTION_ANCHOR = { scrollMarginTop: "calc(72px + env(safe-area-inset-top, 0px))" }; // keeps a linked section clear of the sticky nav
+
+// "#/itinerary" → {view:"itinerary", section:null}, "#/deckhands/crew" → {view:"deckhands", section:"crew"};
+// anything that isn't a real tab (or has an unknown section) → null
+export function parseHash(hash){
+  const m = /^#\/?([\w-]+)(?:\/([\w-]+))?\/?$/.exec(hash||"");
+  if(!m || !TAB_IDS.includes(m[1])) return null;
+  const section = m[2]||null;
+  if(section && !validSection(m[1], section)) return null;
+  return { view:m[1], section };
 }
-// Where to land: the page in the URL, else the dashboard
-export const landingView = () => viewFromHash(typeof window!=="undefined" ? window.location.hash : "") || "dashboard";
-// Puts a tab in the URL (a new history entry, or replacing the current one); non-tab views leave the URL alone
-export function writeViewHash(view, replace=false){
+export const viewFromHash = (hash) => parseHash(hash)?.view ?? null;
+export const sectionFromHash = (hash) => parseHash(hash)?.section ?? null;
+// Where to land: the page (and section) in the URL, else the dashboard
+export const landingTarget = () => parseHash(typeof window!=="undefined" ? window.location.hash : "") || { view:"dashboard", section:null };
+export const landingView = () => landingTarget().view;
+// Puts a tab (and section) in the URL (a new history entry, or replacing the current one); non-tab views leave the URL alone
+export function writeViewHash(view, replace=false, section=null){
   if(typeof window==="undefined" || !TAB_IDS.includes(view)) return;
-  const want = "#/"+view;
+  const want = "#/"+view+(validSection(view, section) ? "/"+section : "");
   if(window.location.hash===want) return;
   window.history[replace?"replaceState":"pushState"](null, "", want);
 }
@@ -2915,7 +2933,7 @@ export function clearViewHash(){
 }
 
 function Shell({ctx}){
-  const {profile,view,setView,doLogout,menuOpen,setMenuOpen,canUseEngineRoom,usersReady}=ctx;
+  const {profile,view,viewSection,setView,doLogout,menuOpen,setMenuOpen,canUseEngineRoom,usersReady}=ctx;
   const tabs=TABS.filter(t=>!t.admin||canUseEngineRoom); // the Engine Room is only offered to admins
   const navBg="rgba(17,24,39,0.96)";
   const navRef=useRef(null), menuBtnRef=useRef(null), menuRef=useRef(null), mainRef=useRef(null), firstView=useRef(true);
@@ -2930,9 +2948,9 @@ function Shell({ctx}){
     const tab=TABS.find(t=>t.id===view);
     document.title=tab?`${tab.label} · Cottage Con ⚙`:"Cottage Con ⚙";
     if(firstView.current){ firstView.current=false; return; }
-    window.scrollTo(0,0);
+    if(!viewSection) window.scrollTo(0,0); // a linked section is scrolled to by its own page
     if(!navRef.current?.contains(document.activeElement)) mainRef.current?.focus({preventScroll:true});
-  },[view]);
+  },[view,viewSection]);
   useEffect(()=>()=>{ document.title="Cottage Con ⚙"; },[]);
 
   // Open mobile menu: Escape closes it, the page behind it doesn't scroll, and focus moves into it
@@ -3214,8 +3232,8 @@ export function Dashboard({ctx}){
     {/* ── Clickable stat cards ── */}
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:12,marginBottom:24}}>
       {[
-        {label:"Crew",       val:uList.length,                                        emoji:"👓", color:"#50C8FF", glow:"#50C8FF", nav:"deckhands"},
-        {label:"Open Duties",val:openDuties,                                          emoji:"🪣", color:"#B79CFF", glow:"#B79CFF", nav:"deckhands",
+        {label:"Crew",       val:uList.length,                                        emoji:"👓", color:"#50C8FF", glow:"#50C8FF", nav:"deckhands", section:"crew"},
+        {label:"Open Duties",val:openDuties,                                          emoji:"🪣", color:"#B79CFF", glow:"#B79CFF", nav:"deckhands", section:"duties",
           sub:dutySlots.length?`You signed up for ${myDuties}`:"No duties set up yet"},
         {label:"Cargo Hold", val:realGames.length,                                    emoji:"🎲", color:"#FFD060", glow:"#FFD060", nav:"games", sub:`You added ${myGames}`},
         {label:"Votes",      val:gList.reduce((s,g)=>s+(g.likes?.length||0),0),      emoji:"❤️", color:"#FF6070", glow:"#FF6070", nav:"games", sub:`You cast ${myVotes}`},
@@ -3223,7 +3241,7 @@ export function Dashboard({ctx}){
         {label:"Gear",       val:sList.length,                                        emoji:"⚙️", color:"#ee7b2e", glow:"#ee7b2e", nav:"potluck", sub:`You added ${mySupplies}`},
       ].map(s=>(
         <div key={s.label}
-          onClick={()=>s.nav&&setView(s.nav)}
+          onClick={()=>s.nav&&(s.section?setView(s.nav,{section:s.section}):setView(s.nav))}
           style={{background:T.surface,border:`3px solid ${T.border2}`,borderRadius:8,padding:"16px 8px",textAlign:"center",position:"relative",overflow:"hidden",
             backgroundImage:`linear-gradient(180deg,${T.surface} 0%,${T.surface2} 100%)`,
             cursor:s.nav?"pointer":"default",transition:"all .18s",userSelect:"none"}}
@@ -3311,7 +3329,7 @@ export function Dashboard({ctx}){
       </Card>
 
       {/* Crew Roster preview — tap to open Deck Hands */}
-      <div onClick={()=>setView("deckhands")}
+      <div onClick={()=>setView("deckhands",{section:"crew"})}
         style={{background:T.bgMid,border:`3px solid ${T.border2}`,borderRadius:8,padding:"18px 20px",
           position:"relative",cursor:"pointer",transition:"all .18s",userSelect:"none",
           backgroundImage:`linear-gradient(135deg,${T.surface} 0%,${T.surface2} 100%)`,
@@ -4716,7 +4734,7 @@ export function Itinerary({ctx}){
 // ── Deck Hands ────────────────────────────────────────────────────────────────
 
 export function DeckHands({ctx}){
-  const {deckHands,users,authUser,profile,doClaimSlot,doUnclaimSlot,doInitDeckHands}=ctx; // users already destructured
+  const {deckHands,users,authUser,profile,doClaimSlot,doUnclaimSlot,doInitDeckHands,viewSection}=ctx; // users already destructured
   const [initialised,setInitialised]=useState(false);
   const [initing,setIniting]=useState(false);
   const [activeDay,setActiveDay]=useState("Nov 26");
@@ -4728,6 +4746,15 @@ export function DeckHands({ctx}){
       doInitDeckHands().then(()=>{ setInitialised(true); setIniting(false); });
     } else if(Object.keys(deckHands).length>0) setInitialised(true);
   },[deckHands]);
+
+  // Arriving from a link to a section (the Bridge's Crew and Open Duties cards): scroll to it once the page has rendered
+  useEffect(()=>{
+    if(initing||!initialised||!viewSection) return; // wait until the roster exists, so the section is where it will stay
+    const el=document.getElementById("section-"+viewSection);
+    if(!el) return;
+    const calm=window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    el.scrollIntoView({behavior:calm?"auto":"smooth",block:"start"});
+  },[viewSection,initing,initialised]);
 
   const slotsForDay = (day,type) =>
     Object.values(deckHands).filter(s=>s.day===day&&s.type===type)
@@ -4746,6 +4773,7 @@ export function DeckHands({ctx}){
   return <div className="cc-fade">
     <SectionTitle sub="Sign up for preparation and cleanup duties each day">Deck Hands</SectionTitle>
 
+    <div id="section-duties" style={SECTION_ANCHOR}>
     {/* My assignments summary */}
     {mySlots.length>0&&<Card style={{background:T.bgMid,border:`1px solid ${T.amber}55`,marginBottom:20}}>
       <h3 style={{fontFamily:"'Cinzel',serif",fontSize:13,color:T.amber,marginBottom:10,letterSpacing:".04em"}}>⚙️ My Duty Assignments</h3>
@@ -4788,7 +4816,10 @@ export function DeckHands({ctx}){
       />
     </div>
 
+    </div>
+
     {/* Crew Roster — below the duties */}
+    <div id="section-crew" style={SECTION_ANCHOR}>
     <Card style={{background:T.bgMid,marginTop:24,cursor:"default"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
         <h3 style={{fontFamily:"'Cinzel',serif",fontSize:12,color:T.amber,letterSpacing:".05em"}}>
@@ -4849,6 +4880,7 @@ export function DeckHands({ctx}){
         })}
       </div>
     </Card>
+    </div>
   </div>;
 }
 

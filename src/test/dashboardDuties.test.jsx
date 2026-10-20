@@ -60,7 +60,7 @@ describe('Bridge: Open Duties card', () => {
     const ctx = mkCtx({ a: slot('a') })
     render(<Dashboard ctx={ctx} />)
     await userEvent.click(tile())
-    expect(ctx.setView).toHaveBeenCalledWith('deckhands')
+    expect(ctx.setView).toHaveBeenCalledWith('deckhands', { section: 'duties' })
   })
 
   it('updates as duties are claimed', () => {
