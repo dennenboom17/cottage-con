@@ -7070,6 +7070,19 @@ export function BggLinkText({text}){
   );
 }
 
+// The chat window pops open by itself once, 30 s in. It never pops up again in the same browser session (tab), whether it
+// was left open, dismissed, or the user opened it themselves before it fired. sessionStorage lasts for the tab, across
+// reloads and sign-outs; if it is blocked, a flag held for the life of the page still stops repeats.
+export const ASSISTANT_POPUP_KEY = "cc-assistant-popup";
+export const ASSISTANT_POPUP_DELAY = 30000;
+let assistantPopupMemo = false;
+export function assistantPopupDone(){
+  try { return sessionStorage.getItem(ASSISTANT_POPUP_KEY)==="1"; } catch { return assistantPopupMemo; }
+}
+export function markAssistantPopupDone(){
+  try { sessionStorage.setItem(ASSISTANT_POPUP_KEY,"1"); } catch { assistantPopupMemo = true; }
+}
+
 export function CrewAssistant({ctx}){
   const {profile, authUser, users, games, food, supplies, voyageMenu, deckHands, receipts, itinerary, itinMeta} = ctx;
 
@@ -7125,11 +7138,19 @@ export function CrewAssistant({ctx}){
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[profile?.name]);
 
-  // Auto-popup after 30 seconds — only once per session
+  // Auto-popup once per browser session (see assistantPopupDone): not if it already happened, and not if the user opened the
+  // chat themselves before it was due
   useEffect(()=>{
-    const t = setTimeout(()=>setOpen(true), 30000);
+    if(assistantPopupDone()) return;
+    const t = setTimeout(()=>{
+      if(assistantPopupDone()) return;
+      markAssistantPopupDone();
+      setOpen(true);
+    }, ASSISTANT_POPUP_DELAY);
     return ()=>clearTimeout(t);
   },[]);
+  // However it was opened, it has had its turn
+  useEffect(()=>{ if(open) markAssistantPopupDone(); },[open]);
 
   // Auto-scroll to latest message
   useEffect(()=>{ bottomRef.current?.scrollIntoView({behavior:"smooth"}); },[messages]);
