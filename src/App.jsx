@@ -4735,6 +4735,10 @@ export function DeckHands({ctx}){
 
   const mySlots = Object.values(deckHands).filter(s=>s.claimedBy===authUser?.uid);
 
+  // Only days that have duties are offered; if the chosen day has none (or loses them), show the first day that does
+  const daysWithSlots = COTTAGE_DAYS.filter(d=>Object.values(deckHands).some(s=>s.day===d.short));
+  const shownDay = daysWithSlots.some(d=>d.short===activeDay) ? activeDay : (daysWithSlots[0]?.short ?? activeDay);
+
   if(initing) return <div className="cc-fade"><SectionTitle>Deck Hands</SectionTitle><Spinner label="Preparing the roster…"/></div>;
 
   const uList = Object.values(users);
@@ -4757,28 +4761,28 @@ export function DeckHands({ctx}){
       </div>
     </Card>}
 
-    {/* Day selector */}
-    <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-      {COTTAGE_DAYS.map(d=>(
+    {/* Day selector: only days that have duties */}
+    {daysWithSlots.length>0&&<div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
+      {daysWithSlots.map(d=>(
         <button key={d.short} onClick={()=>setActiveDay(d.short)}
-          style={{fontFamily:"'Cinzel',serif",fontSize:11,fontWeight:700,padding:"6px 13px",borderRadius:5,border:`1px solid ${activeDay===d.short?T.amber:T.border}`,cursor:"pointer",background:activeDay===d.short?T.amberSoft:"transparent",color:activeDay===d.short?T.amber:T.muted,transition:"all .15s",display:"flex",alignItems:"center",gap:5}}>
+          style={{fontFamily:"'Cinzel',serif",fontSize:11,fontWeight:700,padding:"6px 13px",borderRadius:5,border:`1px solid ${shownDay===d.short?T.amber:T.border}`,cursor:"pointer",background:shownDay===d.short?T.amberSoft:"transparent",color:shownDay===d.short?T.amber:T.muted,transition:"all .15s",display:"flex",alignItems:"center",gap:5}}>
           <span>{d.icon}</span>{d.short}
         </button>
       ))}
-    </div>
+    </div>}
 
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:16}}>
       {/* Preparation */}
       <DeckSection
         title="⚙️ Preparation" color={T.steam}
-        slots={slotsForDay(activeDay,"prep")}
+        slots={slotsForDay(shownDay,"prep")}
         authUser={authUser} profile={profile} users={users}
         onClaim={doClaimSlot} onUnclaim={doUnclaimSlot}
       />
       {/* Cleanup */}
       <DeckSection
         title="🧹 Cleanup" color={T.copper}
-        slots={slotsForDay(activeDay,"cleanup")}
+        slots={slotsForDay(shownDay,"cleanup")}
         authUser={authUser} profile={profile} users={users}
         onClaim={doClaimSlot} onUnclaim={doUnclaimSlot}
       />
