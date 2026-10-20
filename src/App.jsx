@@ -3152,6 +3152,12 @@ export function Dashboard({ctx}){
   const dutySlots   = Object.values(deckHands||{});
   const openDuties  = dutySlots.filter(d=>!d.claimedBy).length;
   const myDuties    = dutySlots.filter(d=>d.claimedBy && d.claimedBy===authUser?.uid).length;
+  // The user's own share of each total (nothing when signed out)
+  const meId        = authUser?.uid;
+  const myGames     = meId ? realGames.filter(g=>g.ownerId===meId).length : 0;
+  const myVotes     = meId ? gList.filter(g=>g.likes?.includes(meId)).length : 0;
+  const myFood      = meId ? fList.filter(f=>f.ownerId===meId).length : 0;
+  const mySupplies  = meId ? sList.filter(x=>x.ownerId===meId).length : 0;
   const reqGames    = gList.filter(g=>g.isRequest);
   const sortedReal  = [...realGames].sort((a,b)=>(b.likes?.length||0)-(a.likes?.length||0));
   const sortedReq   = [...reqGames].sort((a,b)=>(b.likes?.length||0)-(a.likes?.length||0));
@@ -3211,10 +3217,10 @@ export function Dashboard({ctx}){
         {label:"Crew",       val:uList.length,                                        emoji:"👓", color:"#50C8FF", glow:"#50C8FF", nav:"deckhands"},
         {label:"Open Duties",val:openDuties,                                          emoji:"🪣", color:"#B79CFF", glow:"#B79CFF", nav:"deckhands",
           sub:dutySlots.length?`You signed up for ${myDuties}`:"No duties set up yet"},
-        {label:"Cargo Hold", val:realGames.length,                                    emoji:"🎲", color:"#FFD060", glow:"#FFD060", nav:"games"},
-        {label:"Votes",      val:gList.reduce((s,g)=>s+(g.likes?.length||0),0),      emoji:"❤️", color:"#FF6070", glow:"#FF6070", nav:"games"},
-        {label:"Provisions", val:fList.length,                                        emoji:"🍲", color:"#70DD80", glow:"#70DD80", nav:"potluck"},
-        {label:"Gear",       val:sList.length,                                        emoji:"⚙️", color:"#ee7b2e", glow:"#ee7b2e", nav:"potluck"},
+        {label:"Cargo Hold", val:realGames.length,                                    emoji:"🎲", color:"#FFD060", glow:"#FFD060", nav:"games", sub:`You added ${myGames}`},
+        {label:"Votes",      val:gList.reduce((s,g)=>s+(g.likes?.length||0),0),      emoji:"❤️", color:"#FF6070", glow:"#FF6070", nav:"games", sub:`You cast ${myVotes}`},
+        {label:"Provisions", val:fList.length,                                        emoji:"🍲", color:"#70DD80", glow:"#70DD80", nav:"potluck", sub:`You added ${myFood}`},
+        {label:"Gear",       val:sList.length,                                        emoji:"⚙️", color:"#ee7b2e", glow:"#ee7b2e", nav:"potluck", sub:`You added ${mySupplies}`},
       ].map(s=>(
         <div key={s.label}
           onClick={()=>s.nav&&setView(s.nav)}
@@ -4709,7 +4715,7 @@ export function Itinerary({ctx}){
 
 // ── Deck Hands ────────────────────────────────────────────────────────────────
 
-function DeckHands({ctx}){
+export function DeckHands({ctx}){
   const {deckHands,users,authUser,profile,doClaimSlot,doUnclaimSlot,doInitDeckHands}=ctx; // users already destructured
   const [initialised,setInitialised]=useState(false);
   const [initing,setIniting]=useState(false);
@@ -4736,8 +4742,50 @@ function DeckHands({ctx}){
   return <div className="cc-fade">
     <SectionTitle sub="Sign up for preparation and cleanup duties each day">Deck Hands</SectionTitle>
 
-    {/* Crew Roster */}
-    <Card style={{background:T.bgMid,marginBottom:20,cursor:"default"}}>
+    {/* My assignments summary */}
+    {mySlots.length>0&&<Card style={{background:T.bgMid,border:`1px solid ${T.amber}55`,marginBottom:20}}>
+      <h3 style={{fontFamily:"'Cinzel',serif",fontSize:13,color:T.amber,marginBottom:10,letterSpacing:".04em"}}>⚙️ My Duty Assignments</h3>
+      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+        {mySlots.map(s=><div key={s.id} style={{background:T.amberSoft,border:`1px solid ${T.amber}`,borderRadius:5,padding:"4px 10px",fontSize:12,color:T.amber,display:"flex",alignItems:"center",gap:6}}>
+          <span style={{fontFamily:"'Cinzel',serif",fontWeight:600}}>{s.day}</span>
+          <span style={{color:T.muted}}>·</span>
+          <span style={{color:s.type==="prep"?T.steam:T.copper}}>{s.type==="prep"?"⚙️ Prep":"🧹 Clean"}</span>
+          <span style={{color:T.muted}}>·</span>
+          <span>{s.task}</span>
+          <button onClick={()=>doUnclaimSlot(s.id)} style={{background:"none",border:"none",cursor:"pointer",color:T.hint,fontSize:12,padding:"0 2px",marginLeft:2}} title="Unassign">✕</button>
+        </div>)}
+      </div>
+    </Card>}
+
+    {/* Day selector */}
+    <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
+      {COTTAGE_DAYS.map(d=>(
+        <button key={d.short} onClick={()=>setActiveDay(d.short)}
+          style={{fontFamily:"'Cinzel',serif",fontSize:11,fontWeight:700,padding:"6px 13px",borderRadius:5,border:`1px solid ${activeDay===d.short?T.amber:T.border}`,cursor:"pointer",background:activeDay===d.short?T.amberSoft:"transparent",color:activeDay===d.short?T.amber:T.muted,transition:"all .15s",display:"flex",alignItems:"center",gap:5}}>
+          <span>{d.icon}</span>{d.short}
+        </button>
+      ))}
+    </div>
+
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:16}}>
+      {/* Preparation */}
+      <DeckSection
+        title="⚙️ Preparation" color={T.steam}
+        slots={slotsForDay(activeDay,"prep")}
+        authUser={authUser} profile={profile} users={users}
+        onClaim={doClaimSlot} onUnclaim={doUnclaimSlot}
+      />
+      {/* Cleanup */}
+      <DeckSection
+        title="🧹 Cleanup" color={T.copper}
+        slots={slotsForDay(activeDay,"cleanup")}
+        authUser={authUser} profile={profile} users={users}
+        onClaim={doClaimSlot} onUnclaim={doUnclaimSlot}
+      />
+    </div>
+
+    {/* Crew Roster — below the duties */}
+    <Card style={{background:T.bgMid,marginTop:24,cursor:"default"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
         <h3 style={{fontFamily:"'Cinzel',serif",fontSize:12,color:T.amber,letterSpacing:".05em"}}>
           <i className="ti ti-users"/> Crew Roster
@@ -4797,48 +4845,6 @@ function DeckHands({ctx}){
         })}
       </div>
     </Card>
-
-    {/* My assignments summary */}
-    {mySlots.length>0&&<Card style={{background:T.bgMid,border:`1px solid ${T.amber}55`,marginBottom:20}}>
-      <h3 style={{fontFamily:"'Cinzel',serif",fontSize:13,color:T.amber,marginBottom:10,letterSpacing:".04em"}}>⚙️ My Duty Assignments</h3>
-      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-        {mySlots.map(s=><div key={s.id} style={{background:T.amberSoft,border:`1px solid ${T.amber}`,borderRadius:5,padding:"4px 10px",fontSize:12,color:T.amber,display:"flex",alignItems:"center",gap:6}}>
-          <span style={{fontFamily:"'Cinzel',serif",fontWeight:600}}>{s.day}</span>
-          <span style={{color:T.muted}}>·</span>
-          <span style={{color:s.type==="prep"?T.steam:T.copper}}>{s.type==="prep"?"⚙️ Prep":"🧹 Clean"}</span>
-          <span style={{color:T.muted}}>·</span>
-          <span>{s.task}</span>
-          <button onClick={()=>doUnclaimSlot(s.id)} style={{background:"none",border:"none",cursor:"pointer",color:T.hint,fontSize:12,padding:"0 2px",marginLeft:2}} title="Unassign">✕</button>
-        </div>)}
-      </div>
-    </Card>}
-
-    {/* Day selector */}
-    <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-      {COTTAGE_DAYS.map(d=>(
-        <button key={d.short} onClick={()=>setActiveDay(d.short)}
-          style={{fontFamily:"'Cinzel',serif",fontSize:11,fontWeight:700,padding:"6px 13px",borderRadius:5,border:`1px solid ${activeDay===d.short?T.amber:T.border}`,cursor:"pointer",background:activeDay===d.short?T.amberSoft:"transparent",color:activeDay===d.short?T.amber:T.muted,transition:"all .15s",display:"flex",alignItems:"center",gap:5}}>
-          <span>{d.icon}</span>{d.short}
-        </button>
-      ))}
-    </div>
-
-    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:16}}>
-      {/* Preparation */}
-      <DeckSection
-        title="⚙️ Preparation" color={T.steam}
-        slots={slotsForDay(activeDay,"prep")}
-        authUser={authUser} profile={profile} users={users}
-        onClaim={doClaimSlot} onUnclaim={doUnclaimSlot}
-      />
-      {/* Cleanup */}
-      <DeckSection
-        title="🧹 Cleanup" color={T.copper}
-        slots={slotsForDay(activeDay,"cleanup")}
-        authUser={authUser} profile={profile} users={users}
-        onClaim={doClaimSlot} onUnclaim={doUnclaimSlot}
-      />
-    </div>
   </div>;
 }
 
