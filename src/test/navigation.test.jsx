@@ -243,7 +243,7 @@ describe('changing page', () => {
 
   it('names the page in the tab title', async () => {
     const user = await openApp()
-    expect(document.title).toBe('Bridge · Cottage Con ⚙')
+    await vi.waitFor(() => expect(document.title).toBe('Bridge · Cottage Con ⚙')) // the first render may be a beat ahead of the landing page
     await user.click(tab(/Itinerary/))
     expect(document.title).toBe('Itinerary · Cottage Con ⚙')
   })

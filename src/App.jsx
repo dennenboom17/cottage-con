@@ -3367,8 +3367,11 @@ export function IconBtn({onClick,title,children,active,activeColor,disabled,dang
   return <button {...props}>{children}</button>;
 }
 
+// Who may edit or remove something that has an owner (game, game request, provision, gear, dish, receipt): its owner, or an admin.
+export const canManage = (item, uid, isAdmin) => !!(isAdmin || (uid && item?.ownerId === uid));
+
 export function GameChest({ctx}){
-  const {games,users,authUser,profile,food,doSaveGame,doDelGame,doToggleLike,doLogGamePlayed,doRemoveGamePlayed,showToast}=ctx;
+  const {games,users,authUser,profile,food,doSaveGame,doDelGame,doToggleLike,doLogGamePlayed,doRemoveGamePlayed,showToast,isAdmin}=ctx;
   const [showAdd,setShowAdd]     = useState(false);
   const [showReq,setShowReq]     = useState(false);
   const [editGame,setEditGame]   = useState(null);
@@ -3892,7 +3895,7 @@ export function GameChest({ctx}){
                   <i className={`ti ${hasPlayed?"ti-circle-check":"ti-dice"}`} style={{fontSize:12}}/>
                   {hasPlayed?"Played":"Log Play"}
                 </IconBtn>
-                {isOwner&&<>
+                {canManage(g,authUser?.uid,isAdmin)&&<>
                   <IconBtn onClick={()=>openEdit(g)} title="Edit this game entry">
                     <i className="ti ti-pencil" style={{fontSize:12}}/> Edit
                   </IconBtn>
@@ -3961,7 +3964,7 @@ export function GameChest({ctx}){
                 </div>}
                 {g.notes&&<div style={{fontSize:12,color:T.muted,marginTop:4,fontStyle:"italic"}}>"{g.notes}"</div>}
               </div>
-              {isOwner&&<button onClick={()=>doDelGame(g.id)} title="Remove request"
+              {canManage(g,authUser?.uid,isAdmin)&&<button onClick={()=>doDelGame(g.id)} title="Remove request"
                 style={{background:T.dangerBg,border:`2px solid ${T.danger}44`,borderRadius:4,cursor:"pointer",color:T.danger,fontSize:13,padding:"4px 7px"}}>
                 <i className="ti ti-trash"/>
               </button>}
@@ -3985,8 +3988,58 @@ export function GameChest({ctx}){
 }
 
 // ── Provisions / Galley ───────────────────────────────────────────────────────
-function Provisions({ctx}){
-  const {food,supplies,voyageMenu,users,authUser,doSaveFood,doDelFood,doSaveSupply,doDelSupply,doSaveMenuItem,doDelMenuItem,showToast}=ctx;
+// A provision or piece of gear in the Galley. Everyone sees it; the owner (or an admin) can remove it, and an admin can edit it.
+function GalleyItemRow({item,variant,chipCol,cats,isFood,canEdit,canDelete,onSave,onDelete}){
+  const [editing,setEditing]=useState(false);
+  const [f,setF]=useState({name:"",category:"",serves:"",notes:""});
+  const mine=variant==="mine";
+  const box={display:"flex",alignItems:"center",gap:mine?12:10,padding:mine?"10px 14px":"8px 10px",background:T.surface,borderRadius:mine?8:6,border:`1px solid ${T.border}`};
+  const start=()=>{ setF({name:item.name||"",category:item.category||cats[0],serves:item.serves||"",notes:item.notes||""}); setEditing(true); };
+  const save=async()=>{
+    if(!f.name.trim()) return;
+    await onSave({...item,name:f.name.trim(),category:f.category,notes:f.notes.trim(),...(isFood?{serves:f.serves}:{})});
+    setEditing(false);
+  };
+  if(editing) return (
+    <div style={{...box,flexDirection:"column",alignItems:"stretch",gap:10,border:`1.5px solid ${T.amber}55`}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10}}>
+        <Inp label={isFood?"Dish / drink *":"Item name *"} value={f.name} onChange={e=>setF(p=>({...p,name:e.target.value}))} containerStyle={{gridColumn:"1/-1"}}/>
+        <Sel label="Category" value={f.category} onChange={e=>setF(p=>({...p,category:e.target.value}))}>
+          {cats.map(c=><option key={c}>{c}</option>)}
+        </Sel>
+        {isFood&&<Inp label="Serves (approx.)" value={f.serves} onChange={e=>setF(p=>({...p,serves:e.target.value}))}/>}
+        <Inp label={isFood?"Allergens / notes":"Brand, quantity…"} value={f.notes} onChange={e=>setF(p=>({...p,notes:e.target.value}))} containerStyle={{gridColumn:"1/-1"}}/>
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <Btn variant="ghost" size="sm" onClick={()=>setEditing(false)}>Cancel</Btn>
+        <Btn size="sm" onClick={save} disabled={!f.name.trim()}>Save</Btn>
+      </div>
+    </div>
+  );
+  return (
+    <div style={box}>
+      <div style={{flex:1}}>
+        <div style={{fontWeight:500,color:T.text,fontSize:13}}>{item.name}</div>
+        <div style={{display:"flex",gap:mine?6:5,marginTop:mine?4:3,flexWrap:"wrap",alignItems:"center"}}>
+          <Chip color={chipCol}>{item.category}</Chip>
+          {item.serves && <span style={{fontSize:11,color:T.hint}}>Serves {item.serves}</span>}
+          {item.notes  && <span style={{fontSize:11,color:T.hint}}>{item.notes}</span>}
+        </div>
+      </div>
+      {canEdit&&<button onClick={start} aria-label={`Edit ${item.name}`} title="Edit"
+        style={{background:"transparent",border:"none",cursor:"pointer",color:T.hint,fontSize:13,padding:"4px 6px"}}>
+        <i className="ti ti-pencil"/>
+      </button>}
+      {canDelete&&<button onClick={()=>onDelete(item.id)} aria-label={`Remove ${item.name}`} title="Remove"
+        style={{background:T.dangerBg,border:`1px solid ${T.danger}44`,borderRadius:4,cursor:"pointer",color:T.danger,fontSize:13,padding:"4px 7px"}}>
+        <i className="ti ti-trash"/>
+      </button>}
+    </div>
+  );
+}
+
+export function Provisions({ctx}){
+  const {food,supplies,voyageMenu,users,authUser,doSaveFood,doDelFood,doSaveSupply,doDelSupply,doSaveMenuItem,doDelMenuItem,showToast,isAdmin}=ctx;
   const [tab,setTab]=useState("food");
   const [showAdd,setShowAdd]=useState(false);
   const [iname,setIname]=useState(""); const [icat,setIcat]=useState(FOOD_CATS[0]);
@@ -4010,6 +4063,9 @@ function Provisions({ctx}){
   };
 
   const myItems=items.filter(i=>i.ownerId===authUser?.uid);
+  const rowProps={chipCol,cats:CATS,isFood,canEdit:!!isAdmin,
+    onSave:async it=>{ await (isFood?doSaveFood(it):doSaveSupply(it)); showToast(isFood?"Provision updated! 🍲":"Gear updated! ⚙️"); },
+    onDelete:id=>isFood?doDelFood(id):doDelSupply(id)};
   const byUser=Object.values(users)
     .filter(u=>u.id!==authUser?.uid)
     .map(u=>({user:u,items:items.filter(i=>i.ownerId===u.id)}))
@@ -4090,24 +4146,7 @@ function Provisions({ctx}){
                 <p style={{fontSize:13,fontFamily:"'Cinzel',serif"}}>{isFood?"Nothing stowed yet.":"No gear loaded."}</p>
               </div>
             : <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:20}}>
-                {myItems.map(item=>(
-                  <div key={item.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",
-                    background:T.surface,border:`1px solid ${T.border}`,borderRadius:8}}>
-                    <div style={{flex:1}}>
-                      <div style={{fontWeight:500,color:T.text,fontSize:13}}>{item.name}</div>
-                      <div style={{display:"flex",gap:6,marginTop:4,flexWrap:"wrap",alignItems:"center"}}>
-                        <Chip color={chipCol}>{item.category}</Chip>
-                        {item.serves && <span style={{fontSize:11,color:T.hint}}>Serves {item.serves}</span>}
-                        {item.notes  && <span style={{fontSize:11,color:T.hint}}>{item.notes}</span>}
-                      </div>
-                    </div>
-                    <button onClick={()=>isFood?doDelFood(item.id):doDelSupply(item.id)}
-                      style={{background:T.dangerBg,border:`1px solid ${T.danger}44`,borderRadius:4,
-                        cursor:"pointer",color:T.danger,fontSize:13,padding:"4px 7px"}}>
-                      <i className="ti ti-trash"/>
-                    </button>
-                  </div>
-                ))}
+                {myItems.map(item=><GalleyItemRow key={item.id} item={item} variant="mine" canDelete={canManage(item,authUser?.uid,isAdmin)} {...rowProps}/>)}
               </div>
           }
 
@@ -4140,19 +4179,7 @@ function Provisions({ctx}){
                     </div>
                     {open && (
                       <div style={{padding:"10px 12px",display:"flex",flexDirection:"column",gap:7,background:T.bg}}>
-                        {ui.map(item=>(
-                          <div key={item.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",
-                            background:T.surface,borderRadius:6,border:`1px solid ${T.border}`}}>
-                            <div style={{flex:1}}>
-                              <div style={{fontWeight:500,fontSize:13,color:T.text}}>{item.name}</div>
-                              <div style={{display:"flex",gap:5,marginTop:3,flexWrap:"wrap"}}>
-                                <Chip color={chipCol}>{item.category}</Chip>
-                                {item.serves && <span style={{fontSize:11,color:T.hint}}>Serves {item.serves}</span>}
-                                {item.notes  && <span style={{fontSize:11,color:T.hint}}>{item.notes}</span>}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                        {ui.map(item=><GalleyItemRow key={item.id} item={item} variant="crew" canDelete={canManage(item,authUser?.uid,isAdmin)} {...rowProps}/>)}
                       </div>
                     )}
                   </div>
@@ -4170,6 +4197,8 @@ function Provisions({ctx}){
           authUser={authUser}
           doSaveMenuItem={doSaveMenuItem}
           doDelMenuItem={doDelMenuItem}
+          isAdmin={isAdmin}
+          showToast={showToast}
         />
       )}
     </div>
@@ -4180,10 +4209,16 @@ function Provisions({ctx}){
 // ── Voyage Menu ───────────────────────────────────────────────────────────────
 const MENU_MEALS = ["Breakfast","Lunch","Dinner"];
 
-function VoyageMenu({voyageMenu,users,authUser,doSaveMenuItem,doDelMenuItem}){
+function VoyageMenu({voyageMenu,users,authUser,doSaveMenuItem,doDelMenuItem,isAdmin,showToast}){
   const [activeDay,setActiveDay]=useState("Nov 26");
   const [showAddFor,setShowAddFor]=useState(null); // "Nov 26|Breakfast"
   const [newDish,setNewDish]=useState(""); const [newNotes,setNewNotes]=useState("");
+  const [editItem,setEditItem]=useState(null); // admin editing a dish: {id,dish,notes}
+  const saveEdit=async orig=>{
+    if(!editItem?.dish.trim()) return;
+    await doSaveMenuItem({...orig,dish:editItem.dish.trim(),notes:editItem.notes.trim()});
+    setEditItem(null); showToast?.("Dish updated! 🍽️");
+  };
 
   const itemsForDayMeal=(day,meal)=>Object.values(voyageMenu).filter(m=>m.day===day&&m.meal===meal);
 
@@ -4230,6 +4265,14 @@ function VoyageMenu({voyageMenu,users,authUser,doSaveMenuItem,doDelMenuItem}){
             {mealItems.map(item=>{
               const owner=users[item.ownerId];
               const isMine=item.ownerId===authUser?.uid;
+              if(isAdmin&&editItem?.id===item.id) return <div key={item.id} style={{display:"flex",flexDirection:"column",gap:8,padding:"10px",background:T.surface2,borderRadius:6,border:`1.5px solid ${T.amber}55`}}>
+                <Inp label="Dish name *" value={editItem.dish} onChange={e=>setEditItem(p=>({...p,dish:e.target.value}))}/>
+                <Inp label="Notes (serves, allergens…)" value={editItem.notes} onChange={e=>setEditItem(p=>({...p,notes:e.target.value}))}/>
+                <div style={{display:"flex",gap:8}}>
+                  <Btn variant="ghost" size="sm" onClick={()=>setEditItem(null)}>Cancel</Btn>
+                  <Btn size="sm" onClick={()=>saveEdit(item)} disabled={!editItem.dish.trim()}>Save</Btn>
+                </div>
+              </div>;
               return <div key={item.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:T.surface,borderRadius:6,border:`1px solid ${T.border}`}}>
                 <div style={{flex:1}}>
                   <div style={{fontSize:13,fontWeight:500,color:T.text}}>{item.dish}</div>
@@ -4238,7 +4281,8 @@ function VoyageMenu({voyageMenu,users,authUser,doSaveMenuItem,doDelMenuItem}){
                     {item.notes&&<span style={{fontSize:11,color:T.hint}}>· {item.notes}</span>}
                   </div>
                 </div>
-                {isMine&&<button onClick={()=>doDelMenuItem(item.id)} style={{background:T.dangerBg,border:`1px solid ${T.danger}44`,borderRadius:4,cursor:"pointer",color:T.danger,fontSize:12,padding:"3px 6px"}}><i className="ti ti-trash"/></button>}
+                {isAdmin&&<button onClick={()=>setEditItem({id:item.id,dish:item.dish||"",notes:item.notes||""})} aria-label={`Edit ${item.dish}`} title="Edit" style={{background:"transparent",border:"none",cursor:"pointer",color:T.hint,fontSize:13,padding:"3px 6px"}}><i className="ti ti-pencil"/></button>}
+                {canManage(item,authUser?.uid,isAdmin)&&<button onClick={()=>doDelMenuItem(item.id)} aria-label={`Remove ${item.dish}`} title="Remove" style={{background:T.dangerBg,border:`1px solid ${T.danger}44`,borderRadius:4,cursor:"pointer",color:T.danger,fontSize:12,padding:"3px 6px"}}><i className="ti ti-trash"/></button>}
               </div>;
             })}
           </div>
@@ -4828,7 +4872,7 @@ function DeckSection({title,color,slots,authUser,profile,users,onClaim,onUnclaim
 
 // ── Manifest (Receipt Upload) ─────────────────────────────────────────────────
 export function Manifest({ctx}){
-  const {receipts,users,authUser,profile,doSaveReceipt,doDelReceipt,showToast}=ctx;
+  const {receipts,users,authUser,profile,doSaveReceipt,doDelReceipt,showToast,isAdmin}=ctx;
   const [uploading,  setUploading]  = useState(false);
   const [scanning,   setScanning]   = useState(false);
   const [imgErr,     setImgErr]     = useState("");
@@ -5039,6 +5083,7 @@ export function Manifest({ctx}){
           {receiptList.map(r=>{
             const owner=users[r.ownerId];
             const isOwner=r.ownerId===authUser?.uid;
+            const manage=canManage(r,authUser?.uid,isAdmin);
             return (
               <Card key={r.id} style={{background:T.bgMid,padding:0,overflow:"hidden"}}>
                 {/* Receipt image */}
@@ -5064,11 +5109,11 @@ export function Manifest({ctx}){
                       {owner&&<><Avatar name={owner.name} picture={owner.picture} size={36}/>
                       <span style={{fontSize:11,color:T.hint}}>{isOwner?"You":owner.name}</span></>}
                     </div>
-                    {isOwner&&<button onClick={()=>openEditReceipt(r)}
+                    {manage&&<button onClick={()=>openEditReceipt(r)}
                       title="Edit" style={{background:"transparent",border:"none",cursor:"pointer",color:T.hint,fontSize:13,padding:"4px 6px"}}>
                       <i className="ti ti-pencil"/>
                     </button>}
-                    {isOwner&&<button onClick={()=>doDelReceipt(r.id)}
+                    {manage&&<button onClick={()=>doDelReceipt(r.id)}
                       style={{background:T.dangerBg,border:`1px solid ${T.danger}44`,borderRadius:4,cursor:"pointer",color:T.danger,fontSize:12,padding:"3px 7px"}}>
                       <i className="ti ti-trash"/>
                     </button>}
@@ -7131,7 +7176,7 @@ export function CrewAssistant({ctx}){
     sections.push("ADD A GAME: Cargo Hold tab -> tap Load Cargo -> fill in name, category, player count -> Save. BGG URL auto-fills.");
     sections.push("REQUEST A GAME: Cargo Hold -> tap Request Game -> enter game name and note -> Save. Appears as a request until someone brings it.");
     sections.push("VOTE FOR A GAME: Cargo Hold -> tap the heart icon on any game card. Cannot vote for your own games.");
-    sections.push("EDIT / DELETE A GAME: Cargo Hold -> tap the pencil (edit) or trash (delete) icon on your own game cards only.");
+    sections.push("EDIT / DELETE A GAME: Cargo Hold -> tap the pencil (edit) or trash (delete) icon on your own game cards (admins can edit or remove anyone's).");
     sections.push("ADD FOOD: Galley tab -> Food sub-tab -> tap Add Item -> enter name, category, how many it serves -> Save.");
     sections.push("ADD GEAR / SUPPLIES: Galley tab -> Gear sub-tab -> tap Add Item -> enter name and category -> Save.");
     sections.push("PLAN A MEAL: Galley tab -> Voyage Menu sub-tab -> pick a day and meal slot -> tap Add -> enter dish name -> Save.");
