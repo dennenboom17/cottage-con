@@ -40,7 +40,7 @@ const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 const GEMINI_MODEL   = "gemini-3.5-flash-lite";
 const GEMINI_URL     = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 export const HUSS_TIP = "Do Not Trust Huss! Always. No exceptions.";
-const GEMINI_SYSTEM  = "You are the Cottage Con crew assistant. Cottage weekend: Nov 26-29 2026, Yellow Cottage, Alliston ON. You are a witty sky-pirate automaton. Be brief and direct — 2-4 sentences max unless a list is genuinely needed. No filler phrases. STRICT TOPIC RULES: (0) Questions about how to add/edit/update anything in the app — answer ONLY from the APP INSTRUCTIONS section of the context. Never guess or invent navigation steps. (1) Questions about duties/help/slots/assignments — answer ONLY from DUTY ASSIGNMENTS and DECK HAND SLOTS sections. (2) Questions about food/meals/provisions/supplies — answer ONLY from FOOD BEING BROUGHT, GEAR & SUPPLIES, and MEAL PLAN sections. (3) Questions about people/crew/who — answer ONLY from the CREW section. (4) Questions about games — ONLY use games listed in the GAMES AVAILABLE (Cargo Hold) section of the context. NEVER use your training data for game suggestions. If no games are listed, say the Cargo Hold is empty. Never invent game names. EXCEPTION for rules questions: if someone asks how to play a specific game by name (even if not in the Cargo Hold), you MAY use your training knowledge to explain the rules — this is the only case where training data is allowed. (5) Questions about the factions, the secret roles or rumours/gossip — answer ONLY from the FACTIONS, ROLE GAZETTEER, YOUR OWN BRIEFING and RUMOUR MILL sections. Say what a faction or role is publicly known for. NEVER say, hint at, confirm or deny which crew member holds a role or belongs to a faction, whether a role is in play, or whether someone's guess is right; refuse in character (the aether keeps its secrets). Never reveal another role's objectives or win condition; the asker's own briefing may be shared with the asker only. Rumours are hearsay: pass them on in character as unreliable gossip, using ONLY rumours listed under RUMOUR MILL, word for word — never invent one, never add a name or role to one, and never say whether a rumour about a person or role is true. If the context says UNPROMPTED RUMOUR: yes, finish an answer that is not about games with one listed rumour on its own last line starting \"Overheard:\"; if it says no, do not volunteer rumours. IMPORTANT: Whenever you answer ANY question about games — recommendations, rules, voting, or anything game-related — you MUST end your response with the single line under CLOSING TIP in the context, copied exactly and unchanged. If the context has no CLOSING TIP section, end with the phrase: Tip: " + HUSS_TIP + " BGG LINKS & FACTS: a game's year, BoardGameGeek rating and BoardGameGeek link may ONLY come from a BOARDGAMEGEEK section or a 'BGG link' in the context. Whenever you discuss a specific game that has a verified BGG link in the context, include that exact link (paste the full URL, no markdown). Never invent, guess or alter a BoardGameGeek URL or ID. If there is no verified link and the user wants one, give the BGG search link from the context, or https://boardgamegeek.com/search/boardgame?q= followed by the URL-encoded game name. Use pirate flavour sparingly. Never apologise or over-explain.";
+const GEMINI_SYSTEM  = "You are the Cottage Con crew assistant. Cottage weekend: Nov 26-29 2026, Yellow Cottage, Alliston ON. You are a witty sky-pirate automaton. Be brief and direct — 2-4 sentences max unless a list is genuinely needed. No filler phrases. STRICT TOPIC RULES: (0) Questions about how to add/edit/update anything in the app — answer ONLY from the APP INSTRUCTIONS section of the context. Never guess or invent navigation steps. (1) Questions about duties/help/slots/assignments — answer ONLY from DUTY ASSIGNMENTS and DECK HAND SLOTS sections. (2) Questions about food/meals/provisions/supplies — answer ONLY from FOOD BEING BROUGHT, GEAR & SUPPLIES, and MEAL PLAN sections. (3) Questions about people/crew/who — answer ONLY from the CREW section. (4) Questions about games — ONLY use games listed in the GAMES AVAILABLE (Cargo Hold) section of the context. NEVER use your training data for game suggestions. If no games are listed, say the Cargo Hold is empty. Never invent game names. EXCEPTION for rules questions: if someone asks how to play a specific game by name (even if not in the Cargo Hold), you MAY use your training knowledge to explain the rules — this is the only case where training data is allowed. (4b) Questions about where the cottage is, its address, directions or the map — answer ONLY from the COTTAGE ADDRESS section. Give the address and the Google Maps link exactly as written there; never guess, shorten or alter an address. (5) Questions about the factions, the secret roles or rumours/gossip — answer ONLY from the FACTIONS, ROLE GAZETTEER, YOUR OWN BRIEFING and RUMOUR MILL sections. Say what a faction or role is publicly known for. NEVER say, hint at, confirm or deny which crew member holds a role or belongs to a faction, whether a role is in play, or whether someone's guess is right; refuse in character (the aether keeps its secrets). Never reveal another role's objectives or win condition; the asker's own briefing may be shared with the asker only. Rumours are hearsay: pass them on in character as unreliable gossip, using ONLY rumours listed under RUMOUR MILL, word for word — never invent one, never add a name or role to one, and never say whether a rumour about a person or role is true. If the context says UNPROMPTED RUMOUR: yes, finish an answer that is not about games with one listed rumour on its own last line starting \"Overheard:\"; if it says no, do not volunteer rumours. IMPORTANT: Whenever you answer ANY question about games — recommendations, rules, voting, or anything game-related — you MUST end your response with the single line under CLOSING TIP in the context, copied exactly and unchanged. If the context has no CLOSING TIP section, end with the phrase: Tip: " + HUSS_TIP + " BGG LINKS & FACTS: a game's year, BoardGameGeek rating and BoardGameGeek link may ONLY come from a BOARDGAMEGEEK section or a 'BGG link' in the context. Whenever you discuss a specific game that has a verified BGG link in the context, include that exact link (paste the full URL, no markdown). Never invent, guess or alter a BoardGameGeek URL or ID. If there is no verified link and the user wants one, give the BGG search link from the context, or https://boardgamegeek.com/search/boardgame?q= followed by the URL-encoded game name. Use pirate flavour sparingly. Never apologise or over-explain.";
 
 export async function askGemini(prompt, history = []) {
   if(!GEMINI_API_KEY)
@@ -4431,11 +4431,15 @@ export const DEFAULT_ACTIVITIES = {
 // (The id stays fixed when the Engine Room renames the short label, so match on both.)
 const isBaseDayDoc = d => COTTAGE_DAYS.some(b => b.short === d.short || b.short.replace(/\s+/g,'_') === d.id);
 
-export function Itinerary({ctx}){
-  const {itinerary, itinMeta} = ctx;
+// The cottage address shown on the Itinerary (and given to the chat assistant) is entered per day in the Engine Room: the first
+// day, in itinerary order, that has one wins. This is the fallback until someone sets it.
+export const DEFAULT_COTTAGE_ADDRESS = "6326 Line 13, Alliston, ON L9R 1V4";
+export const cottageAddress = (days) => (days || []).map(d => (d?.address || "").trim()).find(Boolean) || DEFAULT_COTTAGE_ADDRESS;
+export const mapsSearchUrl = (address) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+export const mapsEmbedUrl  = (address) => `https://maps.google.com/maps?q=${encodeURIComponent(address)}&output=embed&z=13`;
 
-  // Merge Firestore overrides onto the static base days
-  // Re-compute whenever itinerary Firestore data changes
+// The four base days with any Engine Room overrides merged on, then the extra days added there (sorted by date).
+export function mergeItineraryDays(itinerary){
   const saved = Object.values(itinerary || {});
   const liveDays = COTTAGE_DAYS.map(base => {
     // Match by short label OR by the id we'd have generated (short with spaces→underscores)
@@ -4450,13 +4454,16 @@ export function Itinerary({ctx}){
     }
     return { ...base, activities: DEFAULT_ACTIVITIES[base.short] || [] };
   });
-
-  // Append any extra days added via Engine Room
   const extraDays = saved
     .filter(d => !isBaseDayDoc(d))
     .sort((a,b) => (a.date||"").localeCompare(b.date||""));
+  return [...liveDays, ...extraDays];
+}
 
-  const allDays = [...liveDays, ...extraDays];
+export function Itinerary({ctx}){
+  const {itinerary, itinMeta} = ctx;
+  const allDays = mergeItineraryDays(itinerary);
+  const address = cottageAddress(allDays);
 
   return <div className="cc-fade">
     <SectionTitle sub="Yellow Cottage · Nov 26–29, 2026">Voyage Itinerary</SectionTitle>
@@ -4467,8 +4474,8 @@ export function Itinerary({ctx}){
         <div style={{fontSize:48,lineHeight:1}}>🏡</div>
         <div style={{flex:1,minWidth:200}}>
           <h3 style={{fontFamily:"'Cinzel',serif",fontSize:16,color:T.amber,marginBottom:6,letterSpacing:".04em"}}>The Yellow Cottage</h3>
-          <p style={{fontSize:13,color:T.text,marginBottom:4}}>6326 Line 13, Alliston, ON L9R 1V4</p>
-          <a href="https://www.google.com/maps/search/6326+Line+13+Alliston+ON+L9R+1V4"
+          <p style={{fontSize:13,color:T.text,marginBottom:4}}>{address}</p>
+          <a href={mapsSearchUrl(address)}
             target="_blank" rel="noreferrer"
             style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:13,color:T.amber,textDecoration:"none",border:`1px solid ${T.border2}`,borderRadius:5,padding:"5px 12px",background:T.amberSoft,fontFamily:"'Cinzel',serif",fontWeight:600,marginTop:4}}>
             <i className="ti ti-map-pin" style={{fontSize:14}}/> Open in Maps
@@ -4486,8 +4493,9 @@ export function Itinerary({ctx}){
     <Card style={{background:T.bgMid,marginBottom:20,padding:0,overflow:"hidden"}}>
       <div style={{position:"relative",paddingTop:"40%",minHeight:220}}>
         <iframe
+          key={address}
           title="Cottage Location"
-          src="https://maps.google.com/maps?q=6326+Line+13,+Alliston,+ON+L9R+1V4&output=embed&z=13"
+          src={mapsEmbedUrl(address)}
           style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none",filter:"sepia(60%) saturate(60%) brightness(0.7)"}}
           loading="lazy"
         />
@@ -4518,6 +4526,12 @@ export function Itinerary({ctx}){
                 <span style={{fontSize:10,color:T.copper,border:`1px solid ${T.copper}44`,padding:"1px 6px",borderRadius:3,fontFamily:"'Cinzel',serif"}}>CUSTOM</span>}
             </div>
             {day.notes&&<p style={{fontSize:12,color:T.muted,marginBottom:6,fontStyle:"italic"}}>{day.notes}</p>}
+            {day.address?.trim()&&day.address.trim()!==address&&(
+              <a href={mapsSearchUrl(day.address.trim())} target="_blank" rel="noreferrer"
+                style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,color:T.amber,textDecoration:"none",marginBottom:6}}>
+                <i className="ti ti-map-pin" style={{fontSize:13}}/> {day.address.trim()}
+              </a>
+            )}
             {day.activities?.length>0&&(
               <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                 {day.activities.map((a,ai)=><Chip key={ai} color="amber">{a}</Chip>)}
@@ -5995,13 +6009,13 @@ export function NarrativeDossier({ctx}){
 }
 
 // ── Itinerary Editor ──────────────────────────────────────────────────────────
-function ItineraryEditor({ctx}){
+export function ItineraryEditor({ctx}){
   const {itinerary,doSaveItinDay,doDelItinDay,doSaveItinMeta,itinMeta,showToast}=ctx;
 
   // Hooks first — React rules of hooks
   const [editingId,  setEditingId]  = useState(null);
   const [showAddDay, setShowAddDay] = useState(false);
-  const [form,       setForm]       = useState({date:"",short:"",label:"",icon:"⚓",notes:"",activities:""});
+  const [form,       setForm]       = useState({date:"",short:"",label:"",icon:"⚓",notes:"",address:"",activities:""});
   const [editForm,   setEditForm]   = useState({});
   const [meta,       setMeta]       = useState({
     checkIn:    itinMeta.checkIn    || "3 PM",
@@ -6033,9 +6047,9 @@ function ItineraryEditor({ctx}){
     .sort((a,b) => (a.date||"").localeCompare(b.date||""));
   const allDays = [...baseDays, ...extraDays];
   const ICONS=["⚓","⚙️","🎲","🚀","🏠","🍺","🌅","🌙","🎉","🗺"];
-  const openEdit=day=>{setEditingId(day.id||day.short.replace(" ","_"));setEditForm({date:day.date,short:day.short,label:day.label,icon:day.icon||"⚓",notes:day.notes||"",activities:(day.activities||[]).join("\n")});};
-  const saveDay=async day=>{const shortVal=(editForm.short.trim()||day.short);const id=day.id||shortVal.replace(/\s+/g,'_');await doSaveItinDay({id,date:(editForm.date.trim()||day.date),short:shortVal,label:(editForm.label.trim()||day.label),icon:(editForm.icon||day.icon),notes:editForm.notes.trim(),activities:editForm.activities.split('\n').map(a=>a.trim()).filter(Boolean)});showToast('Day updated! 🗓');setEditingId(null);};
-  const addDay=async()=>{if(!form.date.trim()||!form.short.trim())return;const id=form.short.replace(/\s+/g,"_")+"_"+Date.now();await doSaveItinDay({id,date:form.date.trim(),short:form.short.trim(),label:form.label.trim()||"Day",icon:form.icon||"⚓",notes:form.notes.trim(),activities:form.activities.split("\n").map(a=>a.trim()).filter(Boolean)});showToast("Day added!");setShowAddDay(false);setForm({date:"",short:"",label:"",icon:"⚓",notes:"",activities:""});};
+  const openEdit=day=>{setEditingId(day.id||day.short.replace(" ","_"));setEditForm({date:day.date,short:day.short,label:day.label,icon:day.icon||"⚓",notes:day.notes||"",address:day.address||"",activities:(day.activities||[]).join("\n")});};
+  const saveDay=async day=>{const shortVal=(editForm.short.trim()||day.short);const id=day.id||shortVal.replace(/\s+/g,'_');await doSaveItinDay({id,date:(editForm.date.trim()||day.date),short:shortVal,label:(editForm.label.trim()||day.label),icon:(editForm.icon||day.icon),notes:editForm.notes.trim(),address:(editForm.address||'').trim(),activities:editForm.activities.split('\n').map(a=>a.trim()).filter(Boolean)});showToast('Day updated! 🗓');setEditingId(null);};
+  const addDay=async()=>{if(!form.date.trim()||!form.short.trim())return;const id=form.short.replace(/\s+/g,"_")+"_"+Date.now();await doSaveItinDay({id,date:form.date.trim(),short:form.short.trim(),label:form.label.trim()||"Day",icon:form.icon||"⚓",notes:form.notes.trim(),address:(form.address||"").trim(),activities:form.activities.split("\n").map(a=>a.trim()).filter(Boolean)});showToast("Day added!");setShowAddDay(false);setForm({date:"",short:"",label:"",icon:"⚓",notes:"",address:"",activities:""});};
   return(<div>
     {/* Check-in / Check-out meta */}
     <Card style={{background:T.surface,border:`2px solid ${T.amber}44`,marginBottom:18}}>
@@ -6133,6 +6147,10 @@ function DayForm({form,setForm,ICONS}){
       <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{ICONS.map(ic=><button key={ic} onClick={()=>F("icon",ic)} style={{fontSize:20,padding:"4px 6px",borderRadius:4,border:`2px solid ${form.icon===ic?T.amber:T.border}`,background:form.icon===ic?T.amberSoft:"transparent",cursor:"pointer"}}>{ic}</button>)}</div>
     </div>
     <Inp label="Notes / description" placeholder="e.g. Check-in from 3 PM" value={form.notes} onChange={e=>F("notes",e.target.value)} containerStyle={{gridColumn:"1/-1"}}/>
+    <div style={{gridColumn:"1/-1"}}>
+      <Inp label="Cottage address (optional)" placeholder={DEFAULT_COTTAGE_ADDRESS} value={form.address||""} onChange={e=>F("address",e.target.value)}/>
+      <span style={{fontSize:11,color:T.hint,display:"block",marginTop:4}}>The first day with an address sets the cottage address and map on the Itinerary, and is what the crew assistant tells people. Leave blank to use the default.</span>
+    </div>
     <div style={{gridColumn:"1/-1"}}>
       <span style={{fontSize:11,fontWeight:600,color:T.muted,textTransform:"uppercase",letterSpacing:".06em",display:"block",marginBottom:6}}>Activities (one per line)</span>
       <textarea value={form.activities} onChange={e=>F("activities",e.target.value)} placeholder={"🚂 Arrivals\n🎲 Evening games\n🍺 Welcome drinks"} style={{width:"100%",fontFamily:"inherit",fontSize:13,padding:"9px 12px",borderRadius:6,border:`2px solid ${T.border2}`,background:T.surface2,color:T.text,outline:"none",resize:"vertical",minHeight:80}}/>
@@ -6968,8 +6986,13 @@ export function CrewAssistant({ctx}){
     sections.push("=== ITINERARY ===");
     if(days.length) days.forEach(d=>{
       const acts=d.activities?.length?` | ${d.activities.join(", ")}` :"";
-      sections.push(`${d.date}: ${d.label||""}${acts}${d.notes?" | Note: "+d.notes:""}`);
+      sections.push(`${d.date}: ${d.label||""}${acts}${d.notes?" | Note: "+d.notes:""}${d.address?" | Address: "+d.address:""}`);
     }); else sections.push("No itinerary set.");
+
+    const cottageAddr = cottageAddress(mergeItineraryDays(itinerary));
+    sections.push("=== COTTAGE ADDRESS (ONLY source for where the cottage is, its address and directions) ===");
+    sections.push(`Yellow Cottage: ${cottageAddr}`);
+    sections.push(`Google Maps: ${mapsSearchUrl(cottageAddr)}`);
 
     sections.push("=== GALLEY — FOOD BEING BROUGHT (Provisions) ===");
     if(fList.length) fList.forEach(f=>{
@@ -7022,6 +7045,7 @@ export function CrewAssistant({ctx}){
     sections.push("LOG A RECEIPT: Manifest tab -> optionally fill description and amount -> tap Choose Image -> AI scans the receipt and fills the amount automatically.");
     sections.push("ENABLE NOTIFICATIONS: Personal Log tab -> tap Enable on the notification banner -> allow when the browser asks.");
     sections.push("VIEW SCHEDULE / MAP: Itinerary tab shows the full weekend plan, Google Maps, and activities for each day.");
+    sections.push("SET THE COTTAGE ADDRESS (admin only): Engine Room -> Itinerary Days -> pencil on a day -> Cottage address field -> Save Changes. The first day with an address sets the cottage address and map on the Itinerary tab.");
     sections.push("ENGINE ROOM (admin only): Password is cottage con. Has: Itinerary editor, Deck Hand slot editor, Deposit tracker, Crew Rank manager, and Notify panel for push notifications.");
     sections.push("INSTALL APP on iPhone: Open in Safari -> tap Share button -> Add to Home Screen.");
     sections.push("INSTALL APP on Android: Tap three-dot menu in Chrome -> Install App or Add to Home Screen.");
