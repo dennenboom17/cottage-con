@@ -3140,7 +3140,7 @@ function CountdownTimer(){
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 export function Dashboard({ctx}){
-  const {games,food,supplies,users,authUser,doToggleLike,setView}=ctx;
+  const {games,food,supplies,users,authUser,doToggleLike,setView,deckHands}=ctx;
 
   // Hooks must be declared first (React rules of hooks)
   const [catFilter,setCatFilter] = useState("");
@@ -3148,6 +3148,10 @@ export function Dashboard({ctx}){
   // Derived state
   const gList=Object.values(games), fList=Object.values(food), sList=Object.values(supplies), uList=Object.values(users);
   const realGames   = gList.filter(g=>!g.isRequest);
+  // Deck Hands duties: how many are still unclaimed, and how many of the claimed ones are this user's
+  const dutySlots   = Object.values(deckHands||{});
+  const openDuties  = dutySlots.filter(d=>!d.claimedBy).length;
+  const myDuties    = dutySlots.filter(d=>d.claimedBy && d.claimedBy===authUser?.uid).length;
   const reqGames    = gList.filter(g=>g.isRequest);
   const sortedReal  = [...realGames].sort((a,b)=>(b.likes?.length||0)-(a.likes?.length||0));
   const sortedReq   = [...reqGames].sort((a,b)=>(b.likes?.length||0)-(a.likes?.length||0));
@@ -3205,6 +3209,8 @@ export function Dashboard({ctx}){
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:12,marginBottom:24}}>
       {[
         {label:"Crew",       val:uList.length,                                        emoji:"👓", color:"#50C8FF", glow:"#50C8FF", nav:"deckhands"},
+        {label:"Open Duties",val:openDuties,                                          emoji:"🪣", color:"#B79CFF", glow:"#B79CFF", nav:"deckhands",
+          sub:dutySlots.length?`You signed up for ${myDuties}`:"No duties set up yet"},
         {label:"Cargo Hold", val:realGames.length,                                    emoji:"🎲", color:"#FFD060", glow:"#FFD060", nav:"games"},
         {label:"Votes",      val:gList.reduce((s,g)=>s+(g.likes?.length||0),0),      emoji:"❤️", color:"#FF6070", glow:"#FF6070", nav:"games"},
         {label:"Provisions", val:fList.length,                                        emoji:"🍲", color:"#70DD80", glow:"#70DD80", nav:"potluck"},
@@ -3225,6 +3231,7 @@ export function Dashboard({ctx}){
           <div style={{fontSize:36,lineHeight:1,marginBottom:8,filter:`drop-shadow(0 0 8px ${s.glow}88)`}}>{s.emoji}</div>
           <div style={{fontFamily:"'Cinzel',serif",fontSize:24,color:s.color,fontWeight:700,marginBottom:3,textShadow:`0 0 14px ${s.glow}99`}}>{s.val}</div>
           <div style={{fontSize:10,color:T.muted,fontWeight:600,textTransform:"uppercase",letterSpacing:".06em"}}>{s.label}</div>
+          {s.sub&&<div style={{fontSize:10,color:T.hint,marginTop:3,lineHeight:1.3}}>{s.sub}</div>}
           {s.nav&&<div style={{fontSize:9,color:s.color,marginTop:5,fontFamily:"'Cinzel',serif",opacity:.8,letterSpacing:".06em"}}>TAP TO VIEW →</div>}
         </div>
       ))}
