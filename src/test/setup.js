@@ -42,6 +42,8 @@ Element.prototype.scrollIntoView = vi.fn()
 
 afterEach(() => {
   cleanup()
+  // the app mirrors the current page in the URL hash, and jsdom keeps the URL between tests
+  window.history.replaceState(null, "", window.location.pathname + window.location.search)
   vi.useRealTimers()
   vi.unstubAllGlobals()
 })

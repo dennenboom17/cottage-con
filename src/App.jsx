@@ -2335,11 +2335,32 @@ export default function App(){
   const [suspectScores, setSuspectScores] = useState({});
   const [missionClaims, setMissionClaims] = useState({});
   const [teamSettings, setTeamSettings] = useState({});
-  const [view,      setView]      = useState("login");
+  const [view,      setViewState] = useState("login");
+  const viewRef = useRef("login"); // the view the page is showing, readable from event listeners
   const [toast,    setToast]    = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const showToast = useCallback(msg=>setToast(msg),[]);
+  // Pages are mirrored in the URL hash (#/itinerary) so Back, Forward, reload and shared links work. Only the signed-in tabs
+  // use the hash; the login and setup screens leave the URL alone. `replace` is for moves the user didn't make (landing after sign-in).
+  const setView = useCallback((next, {replace=false}={})=>{
+    viewRef.current = next;
+    setViewState(next);
+    writeViewHash(next, replace);
+  },[]);
   const now = useNow(30000);
+  useEffect(()=>{
+    const onNav = ()=>{
+      if(!TAB_IDS.includes(viewRef.current)) return; // signed out or still setting up: the URL doesn't drive the page
+      const next = landingView();
+      if(next===viewRef.current) return;
+      viewRef.current = next;
+      setViewState(next);
+      setMenuOpen(false);
+    };
+    window.addEventListener("popstate", onNav);
+    window.addEventListener("hashchange", onNav);
+    return ()=>{ window.removeEventListener("popstate", onNav); window.removeEventListener("hashchange", onNav); };
+  },[]);
   const outcome = teamOutcome({users, claims:missionClaims, scores:suspectScores, settings:teamSettings, now});
 
   useEffect(()=>onAuthStateChanged(auth, async user=>{
@@ -2358,7 +2379,7 @@ export default function App(){
         };
         fsSet("users",user.uid,{...data,...loginUpdate});
         setProfile({...data,...loginUpdate});
-        setView("dashboard");
+        setView(landingView(), {replace:true});
 
       } else setView("setup");
     } else { setProfile(null); setView("login"); }
@@ -2407,11 +2428,11 @@ export default function App(){
     await updateProfile(cred.user,{displayName:name});
     const prof={id:cred.user.uid,name,email,dietary,picture:picture||"",crewRank:"Enlisted",createdAt:Date.now(),onboarded:false};
     await setDoc(doc(db,"users",cred.user.uid),prof);
-    setProfile(prof); setView("dashboard");
+    setProfile(prof); setView(landingView(), {replace:true});
     showToast(`All aboard, ${name.split(" ")[0]}! ⚙️`);
   };
   const doLogin  = (email,pw)=>signInWithEmailAndPassword(auth,email,pw);
-  const doLogout = async()=>{ await signOut(auth); setView("login"); };
+  const doLogout = async()=>{ await signOut(auth); clearViewHash(); setView("login"); };
   const doUpdateProfile = async u=>{ await fsSet("users",authUser.uid,u); setProfile(u); showToast("Captain's log updated! ⚙️"); };
   const doLogGamePlayed = async (uid, gameName) => {
     const u = users[uid]||{};
@@ -2854,36 +2875,90 @@ const TABS=[
   {id:"profile",    label:"Personal Log", icon:"ti-user"},
 ];
 
+export const TAB_IDS = TABS.map(t=>t.id);
+
+// "#/itinerary" → "itinerary" (only for a real tab), anything else → null
+export function viewFromHash(hash){
+  const id = /^#\/?([\w-]+)\/?$/.exec(hash||"")?.[1];
+  return TAB_IDS.includes(id) ? id : null;
+}
+// Where to land: the page in the URL, else the dashboard
+export const landingView = () => viewFromHash(typeof window!=="undefined" ? window.location.hash : "") || "dashboard";
+// Puts a tab in the URL (a new history entry, or replacing the current one); non-tab views leave the URL alone
+export function writeViewHash(view, replace=false){
+  if(typeof window==="undefined" || !TAB_IDS.includes(view)) return;
+  const want = "#/"+view;
+  if(window.location.hash===want) return;
+  window.history[replace?"replaceState":"pushState"](null, "", want);
+}
+export function clearViewHash(){
+  if(typeof window!=="undefined" && window.location.hash) window.history.replaceState(null, "", window.location.pathname+window.location.search);
+}
+
 function Shell({ctx}){
   const {profile,view,setView,doLogout,menuOpen,setMenuOpen}=ctx;
   const navBg="rgba(17,24,39,0.96)";
+  const navRef=useRef(null), menuBtnRef=useRef(null), menuRef=useRef(null), mainRef=useRef(null), firstView=useRef(true);
+  const closeMenu=useCallback(returnFocus=>{ setMenuOpen(false); if(returnFocus) menuBtnRef.current?.focus(); },[setMenuOpen]);
+
+  // A page change starts at the top, says where you are in the tab title, and moves focus to the new content (unless the
+  // user is tabbing along the nav bar, where focus stays put so they can keep going)
+  useEffect(()=>{
+    const tab=TABS.find(t=>t.id===view);
+    document.title=tab?`${tab.label} · Cottage Con ⚙`:"Cottage Con ⚙";
+    if(firstView.current){ firstView.current=false; return; }
+    window.scrollTo(0,0);
+    if(!navRef.current?.contains(document.activeElement)) mainRef.current?.focus({preventScroll:true});
+  },[view]);
+  useEffect(()=>()=>{ document.title="Cottage Con ⚙"; },[]);
+
+  // Open mobile menu: Escape closes it, the page behind it doesn't scroll, and focus moves into it
+  useEffect(()=>{
+    if(!menuOpen) return;
+    const onKey=e=>{ if(e.key==="Escape") closeMenu(true); };
+    document.addEventListener("keydown",onKey);
+    const prevOverflow=document.body.style.overflow;
+    document.body.style.overflow="hidden";
+    (menuRef.current?.querySelector('[aria-current="page"]')||menuRef.current?.querySelector("button"))?.focus();
+    return ()=>{ document.removeEventListener("keydown",onKey); document.body.style.overflow=prevOverflow; };
+  },[menuOpen,closeMenu]);
+
+  // The menu is a phone layout: close it if the window grows to the desktop layout (e.g. rotating a tablet)
+  useEffect(()=>{
+    if(typeof window.matchMedia!=="function") return;
+    const mq=window.matchMedia("(min-width: 700px)");
+    const onChange=e=>{ if(e.matches) setMenuOpen(false); };
+    mq.addEventListener?.("change",onChange); mq.addListener?.(onChange);
+    return ()=>{ mq.removeEventListener?.("change",onChange); mq.removeListener?.(onChange); };
+  },[setMenuOpen]);
   return <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",position:"relative",zIndex:1}}>
-    <nav style={{background:navBg,backdropFilter:"blur(12px)",borderBottom:`1.5px solid ${T.border2}`,position:"sticky",top:0,zIndex:100,paddingTop:"env(safe-area-inset-top, 0px)",paddingLeft:16,paddingRight:16,paddingBottom:0,boxShadow:`0 2px 20px rgba(0,0,0,.5),0 1px 0 ${T.amber}22`}}>
+    <nav ref={navRef} aria-label="Main" style={{background:navBg,backdropFilter:"blur(12px)",borderBottom:`1.5px solid ${T.border2}`,position:"sticky",top:0,zIndex:100,paddingTop:"env(safe-area-inset-top, 0px)",paddingLeft:16,paddingRight:16,paddingBottom:0,boxShadow:`0 2px 20px rgba(0,0,0,.5),0 1px 0 ${T.amber}22`}}>
       <div style={{maxWidth:960,margin:"0 auto",height:56,display:"flex",alignItems:"center",gap:6}}>
-        <button onClick={()=>setView("dashboard")} title="Return to Bridge" style={{display:"flex",alignItems:"center",gap:8,marginRight:"auto",background:"none",border:"none",cursor:"pointer",padding:"4px 8px",borderRadius:6,transition:"background .15s"}} onMouseEnter={e=>e.currentTarget.style.background=T.amberSoft} onMouseLeave={e=>e.currentTarget.style.background="none"}>
+        <button onClick={()=>setView("dashboard")} title="Return to Bridge" aria-label="Cottage Con: return to the Bridge" style={{display:"flex",alignItems:"center",gap:8,marginRight:"auto",background:"none",border:"none",cursor:"pointer",padding:"4px 8px",borderRadius:6,transition:"background .15s"}} onMouseEnter={e=>e.currentTarget.style.background=T.amberSoft} onMouseLeave={e=>e.currentTarget.style.background="none"}>
           <GearLogo size={28}/>
           <span style={{fontFamily:"'Cinzel',serif",fontSize:15,color:T.amber,fontWeight:700,letterSpacing:".06em",textShadow:`0 0 10px ${T.amber}55`}}>Cottage Con</span>
           <span style={{fontSize:10,color:T.steam,background:T.steamSoft,padding:"2px 7px",borderRadius:4,fontWeight:500,border:`1px solid ${T.steam}44`,display:"none"}} className="cc-live">⚙ live</span>
         </button>
         {/* Desktop tabs */}
         <div className="cc-desktop-tabs" style={{gap:2}}>
-          {TABS.map(t=><button key={t.id} onClick={()=>setView(t.id)}
+          {TABS.map(t=><button key={t.id} onClick={()=>setView(t.id)} aria-current={view===t.id?"page":undefined}
             style={{fontFamily:"'Cinzel',serif",fontSize:11,fontWeight:700,padding:"6px 11px",borderRadius:5,border:"none",cursor:"pointer",transition:"all .15s",background:view===t.id?T.amber:"transparent",color:view===t.id?T.bg:T.muted,letterSpacing:".04em",alignItems:"center",gap:4,boxShadow:view===t.id?`0 0 10px ${T.amber}44`:"none"}}>
             <i className={`ti ${t.icon}`} style={{fontSize:13}}/>{t.label}
           </button>)}
         </div>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
-          <button onClick={()=>setView("profile")} title="Personal Log" className="cc-desktop-tabs" style={{background:"none",border:"none",cursor:"pointer",padding:2,borderRadius:"50%",transition:"box-shadow .15s"}} onMouseEnter={e=>e.currentTarget.style.boxShadow=`0 0 14px ${T.amber}99`} onMouseLeave={e=>e.currentTarget.style.boxShadow="none"}><Avatar name={profile?.name} picture={profile?.picture} size={32}/></button>
-          <button onClick={doLogout} title="Disembark"
+          <button onClick={()=>setView("profile")} title="Personal Log" aria-label="Personal Log" className="cc-desktop-tabs" style={{background:"none",border:"none",cursor:"pointer",padding:2,borderRadius:"50%",transition:"box-shadow .15s"}} onMouseEnter={e=>e.currentTarget.style.boxShadow=`0 0 14px ${T.amber}99`} onMouseLeave={e=>e.currentTarget.style.boxShadow="none"}><Avatar name={profile?.name} picture={profile?.picture} size={32}/></button>
+          <button onClick={doLogout} title="Disembark" aria-label="Disembark (sign out)"
             className="cc-desktop-tabs"
             style={{background:"none",border:"none",cursor:"pointer",color:T.muted,alignItems:"center",padding:"4px 6px",borderRadius:5}}>
             <i className="ti ti-logout" style={{fontSize:15}}/>
           </button>
           {/* Mobile: avatar + hamburger */}
-          <button onClick={()=>setView("profile")} title="Personal Log" className="cc-hamburger" style={{background:"none",border:"none",cursor:"pointer",padding:2,borderRadius:"50%"}}>
+          <button onClick={()=>setView("profile")} title="Personal Log" aria-label="Personal Log" className="cc-hamburger" style={{background:"none",border:"none",cursor:"pointer",padding:2,borderRadius:"50%"}}>
             <Avatar name={profile?.name} picture={profile?.picture} size={32}/>
           </button>
-          <button onClick={()=>setMenuOpen(!menuOpen)} className="cc-hamburger"
+          <button ref={menuBtnRef} onClick={()=>setMenuOpen(!menuOpen)} className="cc-hamburger"
+            aria-label={menuOpen?"Close menu":"Open menu"} aria-expanded={menuOpen} aria-controls="cc-mobile-menu"
             style={{background:"none",border:"none",cursor:"pointer",color:T.amber,fontSize:22,padding:"6px",lineHeight:1,width:36,height:36,alignItems:"center",justifyContent:"center"}}>
             <i className={`ti ${menuOpen?"ti-x":"ti-menu-2"}`}/>
           </button>
@@ -2892,8 +2967,10 @@ function Shell({ctx}){
     </nav>
 
     {/* Mobile menu */}
-    {menuOpen&&<div style={{position:"fixed",top:"calc(56px + env(safe-area-inset-top, 0px))",left:0,right:0,background:"rgba(17,24,39,0.98)",backdropFilter:"blur(12px)",zIndex:99,borderBottom:`1.5px solid ${T.border2}`,padding:"10px 16px 16px"}}>
-      {TABS.map(t=><button key={t.id} onClick={()=>{setView(t.id);setMenuOpen(false);}}
+    {menuOpen&&<div className="cc-menu-scrim" aria-hidden="true" onClick={()=>closeMenu(true)}
+      style={{position:"fixed",inset:0,zIndex:98,background:"rgba(0,0,0,.45)"}}/>}
+    {menuOpen&&<nav id="cc-mobile-menu" ref={menuRef} aria-label="Menu" style={{position:"fixed",top:"calc(56px + env(safe-area-inset-top, 0px))",left:0,right:0,maxHeight:"calc(100vh - 56px - env(safe-area-inset-top, 0px))",overflowY:"auto",background:"rgba(17,24,39,0.98)",backdropFilter:"blur(12px)",zIndex:99,borderBottom:`1.5px solid ${T.border2}`,padding:"10px 16px 16px"}}>
+      {TABS.map(t=><button key={t.id} onClick={()=>{setView(t.id);setMenuOpen(false);}} aria-current={view===t.id?"page":undefined}
         style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderRadius:6,border:`1px solid ${view===t.id?T.amber:T.border}`,cursor:"pointer",background:view===t.id?T.amberSoft:"transparent",color:view===t.id?T.amber:T.text,fontFamily:"'Cinzel',serif",fontSize:14,fontWeight:700,marginBottom:6,transition:"all .15s"}}>
         <i className={`ti ${t.icon}`} style={{fontSize:18,color:view===t.id?T.amber:T.muted}}/>{t.label}
       </button>)}
@@ -2903,12 +2980,12 @@ function Shell({ctx}){
           <i className="ti ti-logout" style={{fontSize:16}}/>Disembark
         </button>
       </div>
-    </div>}
+    </nav>}
 
     <OnboardingModal ctx={ctx}/>
     <CrewAssistant ctx={ctx}/>
     <VictoryBanner outcome={ctx.teamOutcome}/>
-    <main style={{flex:1,maxWidth:960,margin:"0 auto",width:"100%",padding:"24px 16px"}}>
+    <main ref={mainRef} tabIndex={-1} style={{flex:1,maxWidth:960,margin:"0 auto",width:"100%",padding:"24px 16px",outline:"none"}}>
       {view==="dashboard"  &&<Dashboard ctx={ctx}/>}
       {view==="itinerary"  &&<Itinerary ctx={ctx}/>}
       {view==="games"      &&<GameChest ctx={ctx}/>}
