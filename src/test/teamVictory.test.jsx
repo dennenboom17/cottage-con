@@ -561,7 +561,7 @@ describe('App: team victory', () => {
   const snapshot = (docs) => ({ forEach: (fn) => Object.entries(docs).forEach(([id, data]) => fn({ id, data: () => data })), docChanges: () => [] })
   const listenerFor = (name) => onSnapshot.mock.calls.find(([ref]) => ref.name === name)?.[1]
   const players = {
-    me: profileDoc({ narrativeRole: 'rebel_arms_buyer' }),
+    me: profileDoc({ narrativeRole: 'rebel_arms_buyer', isAdmin: true }),
     d: { id: 'd', name: 'Dev', narrativeRole: 'arms_dealer' },
     a: { id: 'a', name: 'Ann', narrativeRole: 'imperial_agent' },
   }
@@ -597,7 +597,6 @@ describe('App: team victory', () => {
     await openApp()
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: /engine room/i }))
-    await user.type(await screen.findByPlaceholderText(/access code/i), 'cottage con{Enter}')
     await user.click(await screen.findByRole('button', { name: /team victory/i }))
     const pct = await screen.findByLabelText('Victory threshold (%)')
     await user.clear(pct); await user.type(pct, '50')

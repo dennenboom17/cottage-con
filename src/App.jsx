@@ -2302,9 +2302,9 @@ export const cleanGameName = (raw = "") => raw
   .trim();
 
 
-// Fields an admin can change while someone is signed in (tour reset, role, deposit, rank). `profile` is loaded once at
+// Fields an admin can change while someone is signed in (tour reset, role, deposit, rank, admin access). `profile` is loaded once at
 // sign-in, so without this a later profile save would write the old values back over the admin's change.
-const LIVE_PROFILE_FIELDS = ["onboarded", "narrativeRole", "deposit", "crewRank"];
+const LIVE_PROFILE_FIELDS = ["onboarded", "narrativeRole", "deposit", "crewRank", "isAdmin"];
 export function syncLiveProfileFields(profile, live) {
   if (!profile || !live) return profile;
   const changed = LIVE_PROFILE_FIELDS.filter(k => k in live && !Object.is(live[k], profile[k]));
@@ -2596,6 +2596,25 @@ export default function App(){
     if(!quiet) showToast(roleKey ? "Role assigned!" : "Role cleared.");
   };
 
+  // Engine Room access. An admin is a crew member with `isAdmin` on their user doc, ticked in Engine Room → Crew Ranks (and
+  // shown nowhere else). Until the first admin exists the Engine Room is open to everyone signed in, so the first person in
+  // can tick themselves; after that only admins. The live users doc wins over `profile`, which is only read at sign-in.
+  const myDoc = users[authUser?.uid];
+  const usersReady = !!myDoc;
+  const anyAdmin = Object.values(users).some(u=>u?.isAdmin);
+  const isAdmin = !!(myDoc ? myDoc.isAdmin : profile?.isAdmin);
+  const canUseEngineRoom = isAdmin || (usersReady && !anyAdmin);
+
+  // Admin access — Engine Room only. Never leaves the crew without an admin, and the first admin has to be yourself.
+  const doSetAdmin = async (userId, value) => {
+    if(!canUseEngineRoom || !users[userId]) return;
+    const admins = Object.values(users).filter(u=>u?.isAdmin);
+    if(!value && admins.length===1 && admins[0].id===userId){ showToast("There must be at least one admin."); return; }
+    if(value && !admins.length && userId!==authUser?.uid){ showToast("No admin yet: tick yourself first."); return; }
+    await fsSet("users", userId, {isAdmin: !!value});
+    showToast(value ? "Admin access granted." : "Admin access removed.");
+  };
+
   // Crew rank — engine room override (users can also set their own in Personal Log)
   const doSetRank = async (userId, rank) => {
     const userDoc = users[userId];
@@ -2612,7 +2631,7 @@ export default function App(){
     doSaveFood,doDelFood,doSaveSupply,doDelSupply,
     doSaveMenuItem,doDelMenuItem,doClaimSlot,doUnclaimSlot,doInitDeckHands,
     doSaveReceipt,doDelReceipt,
-    doSaveItinDay,doDelItinDay,doSaveDeckSlot,doDelDeckSlot,doSetDeposit,doSetRank,doSendNotification,doSaveCostSettings,costSettings,doSaveItinMeta,itinMeta,doAssignNarrativeRole,suspectScores,doRecordSuspectCheck,missionClaims,doSubmitMissionClaim,doReviewMissionClaim,doForgiveClaimAttempt,teamOutcome:outcome,teamSettings,doSaveTeamSettings,doResetOnboarding,
+    doSaveItinDay,doDelItinDay,doSaveDeckSlot,doDelDeckSlot,doSetDeposit,doSetRank,isAdmin,canUseEngineRoom,usersReady,doSetAdmin,doSendNotification,doSaveCostSettings,costSettings,doSaveItinMeta,itinMeta,doAssignNarrativeRole,suspectScores,doRecordSuspectCheck,missionClaims,doSubmitMissionClaim,doReviewMissionClaim,doForgiveClaimAttempt,teamOutcome:outcome,teamSettings,doSaveTeamSettings,doResetOnboarding,
     notifPerm,notifSupported,requestPermission};
 
   return <>
@@ -2871,7 +2890,7 @@ const TABS=[
   {id:"potluck",    label:"Galley",       icon:"ti-tools-kitchen"},
   {id:"deckhands",  label:"Deck Hands",   icon:"ti-bucket"},
   {id:"manifest",   label:"Manifest",     icon:"ti-receipt"},
-  {id:"engineroom", label:"Engine Room",  icon:"ti-settings-cog"},
+  {id:"engineroom", label:"Engine Room",  icon:"ti-settings-cog", admin:true},
   {id:"profile",    label:"Personal Log", icon:"ti-user"},
 ];
 
@@ -2896,10 +2915,14 @@ export function clearViewHash(){
 }
 
 function Shell({ctx}){
-  const {profile,view,setView,doLogout,menuOpen,setMenuOpen}=ctx;
+  const {profile,view,setView,doLogout,menuOpen,setMenuOpen,canUseEngineRoom,usersReady}=ctx;
+  const tabs=TABS.filter(t=>!t.admin||canUseEngineRoom); // the Engine Room is only offered to admins
   const navBg="rgba(17,24,39,0.96)";
   const navRef=useRef(null), menuBtnRef=useRef(null), menuRef=useRef(null), mainRef=useRef(null), firstView=useRef(true);
   const closeMenu=useCallback(returnFocus=>{ setMenuOpen(false); if(returnFocus) menuBtnRef.current?.focus(); },[setMenuOpen]);
+
+  // Someone who can't use the Engine Room (a stale link, Back, or access taken away while they were in it) goes to the Bridge
+  useEffect(()=>{ if(view==="engineroom" && usersReady && !canUseEngineRoom) setView("dashboard",{replace:true}); },[view,usersReady,canUseEngineRoom,setView]);
 
   // A page change starts at the top, says where you are in the tab title, and moves focus to the new content (unless the
   // user is tabbing along the nav bar, where focus stays put so they can keep going)
@@ -2941,7 +2964,7 @@ function Shell({ctx}){
         </button>
         {/* Desktop tabs */}
         <div className="cc-desktop-tabs" style={{gap:2}}>
-          {TABS.map(t=><button key={t.id} onClick={()=>setView(t.id)} aria-current={view===t.id?"page":undefined}
+          {tabs.map(t=><button key={t.id} onClick={()=>setView(t.id)} aria-current={view===t.id?"page":undefined}
             style={{fontFamily:"'Cinzel',serif",fontSize:11,fontWeight:700,padding:"6px 11px",borderRadius:5,border:"none",cursor:"pointer",transition:"all .15s",background:view===t.id?T.amber:"transparent",color:view===t.id?T.bg:T.muted,letterSpacing:".04em",alignItems:"center",gap:4,boxShadow:view===t.id?`0 0 10px ${T.amber}44`:"none"}}>
             <i className={`ti ${t.icon}`} style={{fontSize:13}}/>{t.label}
           </button>)}
@@ -2970,7 +2993,7 @@ function Shell({ctx}){
     {menuOpen&&<div className="cc-menu-scrim" aria-hidden="true" onClick={()=>closeMenu(true)}
       style={{position:"fixed",inset:0,zIndex:98,background:"rgba(0,0,0,.45)"}}/>}
     {menuOpen&&<nav id="cc-mobile-menu" ref={menuRef} aria-label="Menu" style={{position:"fixed",top:"calc(56px + env(safe-area-inset-top, 0px))",left:0,right:0,maxHeight:"calc(100vh - 56px - env(safe-area-inset-top, 0px))",overflowY:"auto",background:"rgba(17,24,39,0.98)",backdropFilter:"blur(12px)",zIndex:99,borderBottom:`1.5px solid ${T.border2}`,padding:"10px 16px 16px"}}>
-      {TABS.map(t=><button key={t.id} onClick={()=>{setView(t.id);setMenuOpen(false);}} aria-current={view===t.id?"page":undefined}
+      {tabs.map(t=><button key={t.id} onClick={()=>{setView(t.id);setMenuOpen(false);}} aria-current={view===t.id?"page":undefined}
         style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderRadius:6,border:`1px solid ${view===t.id?T.amber:T.border}`,cursor:"pointer",background:view===t.id?T.amberSoft:"transparent",color:view===t.id?T.amber:T.text,fontFamily:"'Cinzel',serif",fontSize:14,fontWeight:700,marginBottom:6,transition:"all .15s"}}>
         <i className={`ti ${t.icon}`} style={{fontSize:18,color:view===t.id?T.amber:T.muted}}/>{t.label}
       </button>)}
@@ -2992,7 +3015,7 @@ function Shell({ctx}){
       {view==="potluck"    &&<Provisions ctx={ctx}/>}
       {view==="deckhands"  &&<DeckHands ctx={ctx}/>}
       {view==="manifest"   &&<Manifest ctx={ctx}/>}
-      {view==="engineroom" &&<EngineRoom ctx={ctx}/>}
+      {view==="engineroom" &&canUseEngineRoom&&<EngineRoom ctx={ctx}/>}
       {view==="profile"    &&<CaptainsLog ctx={ctx}/>}
     </main>
 
@@ -5168,25 +5191,6 @@ export function BggIndexManager({ctx}){
 export function EngineRoom({ctx}){
   const [tab,setTab]=useState("itinerary");
   const waitingClaims=Object.values(ctx.missionClaims||{}).filter(c=>c?.status==="pending").length;
-  const [unlocked,setUnlocked]=useState(false);
-  const [pwInput,setPwInput]=useState("");
-  const [pwErr,setPwErr]=useState("");
-  const tryUnlock=()=>{ if(pwInput.trim().toLowerCase()==="cottage con"){setUnlocked(true);setPwErr("");}else{setPwErr("Incorrect access code.");setPwInput("");} };
-  if(!unlocked) return(
-    <div className="cc-fade" style={{maxWidth:400,margin:"0 auto",paddingTop:32}}>
-      <SectionTitle sub="Restricted access — engineers only">Engine Room</SectionTitle>
-      <Card style={{background:T.surface}}>
-        <div style={{textAlign:"center",marginBottom:20}}><div style={{fontSize:48,marginBottom:8}}>⚙️</div>
-          <h3 style={{fontFamily:"'Cinzel',serif",fontSize:15,color:T.amber,marginBottom:4}}>Access Required</h3>
-          <p style={{fontSize:12,color:T.muted}}>Enter the engine room access code to proceed.</p>
-        </div>
-        <div style={{display:"flex",flexDirection:"column",gap:12}}>
-          <Inp label="Access code" type="password" placeholder="Enter access code…" value={pwInput} onChange={e=>setPwInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&tryUnlock()} error={pwErr}/>
-          <Btn onClick={tryUnlock} disabled={!pwInput.trim()} style={{width:"100%"}}><i className="ti ti-lock-open"/> Access Engine Room</Btn>
-        </div>
-      </Card>
-    </div>
-  );
   return(
     <div className="cc-fade">
       <SectionTitle sub="Manage itinerary days and deck hand duties">Engine Room</SectionTitle>
@@ -6425,11 +6429,12 @@ function DepositManager({ctx}){
 
 // ── Crew Rank Manager (Engine Room only) ─────────────────────────────────────
 function CrewRankManager({ctx}){
-  const {users, doSetRank} = ctx;
+  const {users, doSetRank, doSetAdmin, authUser} = ctx;
   const uList = Object.values(users).sort((a,b)=>(a.name||"").localeCompare(b.name||""));
 
   // Summary counts
   const counts = Object.fromEntries(Object.keys(CREW_RANKS).map(r=>[r, uList.filter(u=>(u.crewRank||"Enlisted")===r).length]));
+  const noAdminYet = !uList.some(u=>u.isAdmin);
 
   return (
     <div>
@@ -6445,6 +6450,12 @@ function CrewRankManager({ctx}){
         </div>
       </div>
 
+      <p style={{fontSize:12,color:noAdminYet?T.amber:T.hint,margin:"0 0 14px",lineHeight:1.5}}>
+        {noAdminYet
+          ?"No admin has been chosen yet, so everyone can see the Engine Room. Tick Admin next to your own name first; after that only admins can see it."
+          :"Admins are the only crew who can see the Engine Room. This is the only place the Admin setting appears."}
+      </p>
+
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
         {uList.map(u=>{
           const currentRank = u.crewRank||"Enlisted";
@@ -6458,6 +6469,14 @@ function CrewRankManager({ctx}){
                 <div style={{fontWeight:600,fontSize:13,color:T.text,marginBottom:2}}>{u.name}</div>
                 <div style={{fontSize:11,color:T.hint}}>{u.email||""}</div>
               </div>
+              {/* Admin access */}
+              <label style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700,fontFamily:"'Cinzel',serif",color:u.isAdmin?T.amber:T.muted,cursor:"pointer"}}>
+                <input type="checkbox" checked={!!u.isAdmin} aria-label={`Admin: ${u.name||"crew member"}`}
+                  disabled={noAdminYet&&u.id!==authUser?.uid}
+                  onChange={e=>doSetAdmin(u.id,e.target.checked)}
+                  style={{width:16,height:16,accentColor:T.amber,cursor:"inherit"}}/>
+                Admin
+              </label>
               {/* Rank selector buttons */}
               <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
                 {Object.entries(CREW_RANKS).map(([r,rc2])=>{
@@ -7122,7 +7141,7 @@ export function CrewAssistant({ctx}){
     sections.push("ENABLE NOTIFICATIONS: Personal Log tab -> tap Enable on the notification banner -> allow when the browser asks.");
     sections.push("VIEW SCHEDULE / MAP: Itinerary tab shows the full weekend plan, Google Maps, and activities for each day.");
     sections.push("SET THE COTTAGE ADDRESS (admin only): Engine Room -> Itinerary Days -> Check-in / Check-out section -> Cottage address -> Save. It sets the address and map on the Itinerary tab.");
-    sections.push("ENGINE ROOM (admin only): Password is cottage con. Has: Itinerary editor, Deck Hand slot editor, Deposit tracker, Crew Rank manager, and Notify panel for push notifications.");
+    sections.push("ENGINE ROOM (admins only; it only appears in the menu for crew an admin has approved). Has: Itinerary editor, Deck Hand slot editor, Deposit tracker, Crew Rank manager, and Notify panel for push notifications.");
     sections.push("INSTALL APP on iPhone: Open in Safari -> tap Share button -> Add to Home Screen.");
     sections.push("INSTALL APP on Android: Tap three-dot menu in Chrome -> Install App or Add to Home Screen.");
     sections.push("AI GAME RECOMMENDER: Cargo Hold tab -> tap Recommend button -> set player count, mood, duration -> tap What Should We Play.");

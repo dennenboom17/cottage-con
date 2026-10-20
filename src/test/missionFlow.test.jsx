@@ -12,7 +12,7 @@ vi.setConfig({ testTimeout: 20000 }) // these drive the whole app, so they are s
 const me = { uid: 'me', email: 'mia@example.com', emailVerified: true, displayName: 'Mia' }
 const profileDoc = (over = {}) => ({ id: 'me', name: 'Mia', email: 'mia@example.com', onboarded: true, crewRank: 'Enlisted', loginHistory: [], ...over })
 const crew = {
-  me: profileDoc({ narrativeRole: 'rebel_arms_buyer' }),
+  me: profileDoc({ narrativeRole: 'rebel_arms_buyer', isAdmin: true }),
   d: { id: 'd', name: 'Dev', narrativeRole: 'arms_dealer' },
   s: { id: 's', name: 'Sam', narrativeRole: 'smuggler' },
 }
@@ -110,7 +110,6 @@ describe('App – mission claims end to end', () => {
     await openApp({ claims: { c1: pending } })
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: /engine room/i }))
-    await user.type(await screen.findByPlaceholderText(/access code/i), 'cottage con{Enter}')
     await user.click(await screen.findByRole('button', { name: /mission claims \(1\)/i }))
     setDoc.mockClear()
     await user.click(await screen.findByRole('button', { name: /approve/i }))
@@ -126,7 +125,6 @@ describe('App – mission claims end to end', () => {
     await openApp({ claims: { c1: pending } })
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: /engine room/i }))
-    await user.type(await screen.findByPlaceholderText(/access code/i), 'cottage con{Enter}')
     await user.click(await screen.findByRole('button', { name: /mission claims/i }))
     await user.type(await screen.findByLabelText('Note to the player'), 'Wrong person')
     setDoc.mockClear()

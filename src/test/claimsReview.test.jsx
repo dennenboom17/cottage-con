@@ -165,7 +165,6 @@ describe('Engine Room', () => {
   const unlock = async (ctx) => {
     const user = userEvent.setup()
     render(<EngineRoom ctx={ctx} />)
-    await user.type(screen.getByPlaceholderText(/access code/i), 'cottage con{Enter}')
     return user
   }
 

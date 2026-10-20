@@ -139,7 +139,6 @@ describe('Engine Room', () => {
       itinerary: {}, itinMeta: {}, doSaveItinDay: vi.fn(), doDelItinDay: vi.fn(), doSaveItinMeta: vi.fn(), showToast: vi.fn(),
     }
     render(<EngineRoom ctx={ctx} />)
-    await user.type(screen.getByPlaceholderText(/access code/i), 'cottage con{Enter}')
     await user.click(await screen.findByRole('button', { name: /welcome tour/i }))
     expect(screen.getByText('1 of 1 crew have the tour waiting.')).toBeInTheDocument()
   })
