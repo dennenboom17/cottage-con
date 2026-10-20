@@ -4431,10 +4431,10 @@ export const DEFAULT_ACTIVITIES = {
 // (The id stays fixed when the Engine Room renames the short label, so match on both.)
 const isBaseDayDoc = d => COTTAGE_DAYS.some(b => b.short === d.short || b.short.replace(/\s+/g,'_') === d.id);
 
-// The cottage address shown on the Itinerary (and given to the chat assistant) is entered per day in the Engine Room: the first
-// day, in itinerary order, that has one wins. This is the fallback until someone sets it.
+// The cottage address shown on the Itinerary (and given to the chat assistant) is one field in the Engine Room, saved with the
+// check-in details in settings/itinMeta. This is the fallback until someone sets it.
 export const DEFAULT_COTTAGE_ADDRESS = "6326 Line 13, Alliston, ON L9R 1V4";
-export const cottageAddress = (days) => (days || []).map(d => (d?.address || "").trim()).find(Boolean) || DEFAULT_COTTAGE_ADDRESS;
+export const cottageAddress = (itinMeta) => (itinMeta?.address || "").trim() || DEFAULT_COTTAGE_ADDRESS;
 export const mapsSearchUrl = (address) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 export const mapsEmbedUrl  = (address) => `https://maps.google.com/maps?q=${encodeURIComponent(address)}&output=embed&z=13`;
 
@@ -4463,7 +4463,7 @@ export function mergeItineraryDays(itinerary){
 export function Itinerary({ctx}){
   const {itinerary, itinMeta} = ctx;
   const allDays = mergeItineraryDays(itinerary);
-  const address = cottageAddress(allDays);
+  const address = cottageAddress(itinMeta);
 
   return <div className="cc-fade">
     <SectionTitle sub="Yellow Cottage · Nov 26–29, 2026">Voyage Itinerary</SectionTitle>
@@ -4526,12 +4526,6 @@ export function Itinerary({ctx}){
                 <span style={{fontSize:10,color:T.copper,border:`1px solid ${T.copper}44`,padding:"1px 6px",borderRadius:3,fontFamily:"'Cinzel',serif"}}>CUSTOM</span>}
             </div>
             {day.notes&&<p style={{fontSize:12,color:T.muted,marginBottom:6,fontStyle:"italic"}}>{day.notes}</p>}
-            {day.address?.trim()&&day.address.trim()!==address&&(
-              <a href={mapsSearchUrl(day.address.trim())} target="_blank" rel="noreferrer"
-                style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:12,color:T.amber,textDecoration:"none",marginBottom:6}}>
-                <i className="ti ti-map-pin" style={{fontSize:13}}/> {day.address.trim()}
-              </a>
-            )}
             {day.activities?.length>0&&(
               <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                 {day.activities.map((a,ai)=><Chip key={ai} color="amber">{a}</Chip>)}
@@ -6015,7 +6009,7 @@ export function ItineraryEditor({ctx}){
   // Hooks first — React rules of hooks
   const [editingId,  setEditingId]  = useState(null);
   const [showAddDay, setShowAddDay] = useState(false);
-  const [form,       setForm]       = useState({date:"",short:"",label:"",icon:"⚓",notes:"",address:"",activities:""});
+  const [form,       setForm]       = useState({date:"",short:"",label:"",icon:"⚓",notes:"",activities:""});
   const [editForm,   setEditForm]   = useState({});
   const [meta,       setMeta]       = useState({
     checkIn:    itinMeta.checkIn    || "3 PM",
@@ -6023,6 +6017,7 @@ export function ItineraryEditor({ctx}){
     checkOut:   itinMeta.checkOut   || "11 AM",
     checkOutDay:itinMeta.checkOutDay|| "Sunday Nov 29",
     parkingNote:itinMeta.parkingNote|| "Parking available on site for all crew vehicles",
+    address:    itinMeta.address    || DEFAULT_COTTAGE_ADDRESS,
   });
   const [metaDirty, setMetaDirty]   = useState(false);
   const [metaSaving,setMetaSaving]  = useState(false);
@@ -6030,7 +6025,7 @@ export function ItineraryEditor({ctx}){
     setMetaSaving(true);
     await doSaveItinMeta(meta);
     setMetaSaving(false); setMetaDirty(false);
-    showToast("Check-in/out times saved! 🕐");
+    showToast("Check-in details saved! 🕐");
   };
 
   // Derived from Firestore itinerary data
@@ -6047,9 +6042,9 @@ export function ItineraryEditor({ctx}){
     .sort((a,b) => (a.date||"").localeCompare(b.date||""));
   const allDays = [...baseDays, ...extraDays];
   const ICONS=["⚓","⚙️","🎲","🚀","🏠","🍺","🌅","🌙","🎉","🗺"];
-  const openEdit=day=>{setEditingId(day.id||day.short.replace(" ","_"));setEditForm({date:day.date,short:day.short,label:day.label,icon:day.icon||"⚓",notes:day.notes||"",address:day.address||"",activities:(day.activities||[]).join("\n")});};
-  const saveDay=async day=>{const shortVal=(editForm.short.trim()||day.short);const id=day.id||shortVal.replace(/\s+/g,'_');await doSaveItinDay({id,date:(editForm.date.trim()||day.date),short:shortVal,label:(editForm.label.trim()||day.label),icon:(editForm.icon||day.icon),notes:editForm.notes.trim(),address:(editForm.address||'').trim(),activities:editForm.activities.split('\n').map(a=>a.trim()).filter(Boolean)});showToast('Day updated! 🗓');setEditingId(null);};
-  const addDay=async()=>{if(!form.date.trim()||!form.short.trim())return;const id=form.short.replace(/\s+/g,"_")+"_"+Date.now();await doSaveItinDay({id,date:form.date.trim(),short:form.short.trim(),label:form.label.trim()||"Day",icon:form.icon||"⚓",notes:form.notes.trim(),address:(form.address||"").trim(),activities:form.activities.split("\n").map(a=>a.trim()).filter(Boolean)});showToast("Day added!");setShowAddDay(false);setForm({date:"",short:"",label:"",icon:"⚓",notes:"",address:"",activities:""});};
+  const openEdit=day=>{setEditingId(day.id||day.short.replace(" ","_"));setEditForm({date:day.date,short:day.short,label:day.label,icon:day.icon||"⚓",notes:day.notes||"",activities:(day.activities||[]).join("\n")});};
+  const saveDay=async day=>{const shortVal=(editForm.short.trim()||day.short);const id=day.id||shortVal.replace(/\s+/g,'_');await doSaveItinDay({id,date:(editForm.date.trim()||day.date),short:shortVal,label:(editForm.label.trim()||day.label),icon:(editForm.icon||day.icon),notes:editForm.notes.trim(),activities:editForm.activities.split('\n').map(a=>a.trim()).filter(Boolean)});showToast('Day updated! 🗓');setEditingId(null);};
+  const addDay=async()=>{if(!form.date.trim()||!form.short.trim())return;const id=form.short.replace(/\s+/g,"_")+"_"+Date.now();await doSaveItinDay({id,date:form.date.trim(),short:form.short.trim(),label:form.label.trim()||"Day",icon:form.icon||"⚓",notes:form.notes.trim(),activities:form.activities.split("\n").map(a=>a.trim()).filter(Boolean)});showToast("Day added!");setShowAddDay(false);setForm({date:"",short:"",label:"",icon:"⚓",notes:"",activities:""});};
   return(<div>
     {/* Check-in / Check-out meta */}
     <Card style={{background:T.surface,border:`2px solid ${T.amber}44`,marginBottom:18}}>
@@ -6085,6 +6080,14 @@ export function ItineraryEditor({ctx}){
             placeholder="e.g. Sunday Nov 29"
             style={{width:"100%",fontFamily:"inherit",fontSize:13,padding:"8px 10px",borderRadius:6,
               border:`2px solid ${T.border2}`,background:T.surface2,color:T.text,outline:"none",boxSizing:"border-box"}}/>
+        </div>
+        <div style={{gridColumn:"1/-1"}}>
+          <span style={{fontSize:11,fontWeight:600,color:T.muted,textTransform:"uppercase",letterSpacing:".06em",display:"block",marginBottom:5}}>Cottage address</span>
+          <input value={meta.address} onChange={e=>{setMeta(m=>({...m,address:e.target.value}));setMetaDirty(true);}}
+            placeholder={DEFAULT_COTTAGE_ADDRESS}
+            style={{width:"100%",fontFamily:"inherit",fontSize:13,padding:"8px 10px",borderRadius:6,
+              border:`2px solid ${T.border2}`,background:T.surface2,color:T.text,outline:"none",boxSizing:"border-box"}}/>
+          <span style={{fontSize:11,color:T.hint,display:"block",marginTop:4}}>Sets the address and map on the Itinerary, and is what the crew assistant tells people.</span>
         </div>
         <div style={{gridColumn:"1/-1"}}>
           <span style={{fontSize:11,fontWeight:600,color:T.muted,textTransform:"uppercase",letterSpacing:".06em",display:"block",marginBottom:5}}>Parking note</span>
@@ -6147,10 +6150,6 @@ function DayForm({form,setForm,ICONS}){
       <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{ICONS.map(ic=><button key={ic} onClick={()=>F("icon",ic)} style={{fontSize:20,padding:"4px 6px",borderRadius:4,border:`2px solid ${form.icon===ic?T.amber:T.border}`,background:form.icon===ic?T.amberSoft:"transparent",cursor:"pointer"}}>{ic}</button>)}</div>
     </div>
     <Inp label="Notes / description" placeholder="e.g. Check-in from 3 PM" value={form.notes} onChange={e=>F("notes",e.target.value)} containerStyle={{gridColumn:"1/-1"}}/>
-    <div style={{gridColumn:"1/-1"}}>
-      <Inp label="Cottage address (optional)" placeholder={DEFAULT_COTTAGE_ADDRESS} value={form.address||""} onChange={e=>F("address",e.target.value)}/>
-      <span style={{fontSize:11,color:T.hint,display:"block",marginTop:4}}>The first day with an address sets the cottage address and map on the Itinerary, and is what the crew assistant tells people. Leave blank to use the default.</span>
-    </div>
     <div style={{gridColumn:"1/-1"}}>
       <span style={{fontSize:11,fontWeight:600,color:T.muted,textTransform:"uppercase",letterSpacing:".06em",display:"block",marginBottom:6}}>Activities (one per line)</span>
       <textarea value={form.activities} onChange={e=>F("activities",e.target.value)} placeholder={"🚂 Arrivals\n🎲 Evening games\n🍺 Welcome drinks"} style={{width:"100%",fontFamily:"inherit",fontSize:13,padding:"9px 12px",borderRadius:6,border:`2px solid ${T.border2}`,background:T.surface2,color:T.text,outline:"none",resize:"vertical",minHeight:80}}/>
@@ -6882,7 +6881,7 @@ export function BggLinkText({text}){
 }
 
 export function CrewAssistant({ctx}){
-  const {profile, authUser, users, games, food, supplies, voyageMenu, deckHands, receipts, itinerary} = ctx;
+  const {profile, authUser, users, games, food, supplies, voyageMenu, deckHands, receipts, itinerary, itinMeta} = ctx;
 
   const firstName = profile?.name?.split(" ")[0] || "Crew";
   const myRoleKey = users?.[authUser?.uid]?.narrativeRole || profile?.narrativeRole;
@@ -6986,10 +6985,10 @@ export function CrewAssistant({ctx}){
     sections.push("=== ITINERARY ===");
     if(days.length) days.forEach(d=>{
       const acts=d.activities?.length?` | ${d.activities.join(", ")}` :"";
-      sections.push(`${d.date}: ${d.label||""}${acts}${d.notes?" | Note: "+d.notes:""}${d.address?" | Address: "+d.address:""}`);
+      sections.push(`${d.date}: ${d.label||""}${acts}${d.notes?" | Note: "+d.notes:""}`);
     }); else sections.push("No itinerary set.");
 
-    const cottageAddr = cottageAddress(mergeItineraryDays(itinerary));
+    const cottageAddr = cottageAddress(itinMeta);
     sections.push("=== COTTAGE ADDRESS (ONLY source for where the cottage is, its address and directions) ===");
     sections.push(`Yellow Cottage: ${cottageAddr}`);
     sections.push(`Google Maps: ${mapsSearchUrl(cottageAddr)}`);
@@ -7045,7 +7044,7 @@ export function CrewAssistant({ctx}){
     sections.push("LOG A RECEIPT: Manifest tab -> optionally fill description and amount -> tap Choose Image -> AI scans the receipt and fills the amount automatically.");
     sections.push("ENABLE NOTIFICATIONS: Personal Log tab -> tap Enable on the notification banner -> allow when the browser asks.");
     sections.push("VIEW SCHEDULE / MAP: Itinerary tab shows the full weekend plan, Google Maps, and activities for each day.");
-    sections.push("SET THE COTTAGE ADDRESS (admin only): Engine Room -> Itinerary Days -> pencil on a day -> Cottage address field -> Save Changes. The first day with an address sets the cottage address and map on the Itinerary tab.");
+    sections.push("SET THE COTTAGE ADDRESS (admin only): Engine Room -> Itinerary Days -> Check-in / Check-out section -> Cottage address -> Save. It sets the address and map on the Itinerary tab.");
     sections.push("ENGINE ROOM (admin only): Password is cottage con. Has: Itinerary editor, Deck Hand slot editor, Deposit tracker, Crew Rank manager, and Notify panel for push notifications.");
     sections.push("INSTALL APP on iPhone: Open in Safari -> tap Share button -> Add to Home Screen.");
     sections.push("INSTALL APP on Android: Tap three-dot menu in Chrome -> Install App or Add to Home Screen.");
