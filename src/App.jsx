@@ -1291,7 +1291,7 @@ export const avColor     = (n="") => AV_COLORS[(n.charCodeAt(0)||0)%AV_COLORS.le
 export const uid         = ()     => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 export const fsSet = (col,id,data) => setDoc(doc(db,col,id), data, {merge:true});
 export const fsDel = (col,id)      => deleteDoc(doc(db,col,id));
-export const subCol = (name,set)   => onSnapshot(collection(db,name), s=>{const d={};s.forEach(x=>d[x.id]=x.data());set(d);});
+export const subCol = (name,set)   => onSnapshot(collection(db,name), s=>{const d={};s.forEach(x=>d[x.id]=x.data());set(d,s.metadata);});
 export const sumAmount = list      => list.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
 
 // ── Image upload hook with size validation ────────────────────────────────────
@@ -2328,6 +2328,9 @@ export default function App(){
   const [supplies,  setSupplies]  = useState({});
   const [voyageMenu,setVoyageMenu]=useState({});
   const [deckHands, setDeckHands] = useState({});
+  // true once the server has answered for deckHands. Until then `deckHands` is only the empty starting value, and treating that
+  // as "there are no slots" is what once made Deck Hands overwrite everyone's sign-ups with the defaults.
+  const [deckHandsLoaded, setDeckHandsLoaded] = useState(false);
   const [receipts,  setReceipts]  = useState({});
   const [itinerary,    setItinerary]    = useState({});
   const [costSettings, setCostSettings] = useState({});
@@ -2392,6 +2395,7 @@ export default function App(){
 
   useEffect(()=>{
     if(!authUser) return;
+    setDeckHandsLoaded(false); // (re)subscribing: wait for the server again
     let notifHistoryLoaded=false;
     const subs=[
       subCol("users",      setUsers),
@@ -2399,7 +2403,7 @@ export default function App(){
       subCol("food",       setFood),
       subCol("supplies",   setSupplies),
       subCol("voyageMenu", setVoyageMenu),
-      subCol("deckHands",  setDeckHands),
+      subCol("deckHands",  (d,meta)=>{ setDeckHands(d); if(!meta?.fromCache) setDeckHandsLoaded(true); }),
       subCol("receipts",   setReceipts),
       subCol("itinerary",  setItinerary),
       subCol("suspectScores", setSuspectScores),
@@ -2485,6 +2489,7 @@ export default function App(){
     await fsSet("deckHands", slotId, { ...slot, claimedBy: null, claimedByName: "" });
   };
   const doInitDeckHands = async () => {
+    if(!deckHandsLoaded) return; // we can't tell which slots exist yet
     const DAYS  = ["Nov 26","Nov 27","Nov 28","Nov 29"];
     const PREP  = ["Grocery run","Unpack & set up","Table & game setup","Activity prep","Welcome drinks setup"];
     const CLEAN = ["Dishes & kitchen","Common area tidy","Trash & recycling","Bathroom check","Final sweep"];
@@ -2492,11 +2497,12 @@ export default function App(){
     DAYS.forEach(day => {
       PREP.forEach((task, i) => {
         const id = `prep_${day.replace(" ","")}${i}`;
-        if (!deckHands[id]) batch.push(fsSet("deckHands", id, { id, day, type:"prep",    task, claimedBy:null, claimedByName:"" }));
+        // identity fields only: a slot that already exists keeps its sign-up even if this ever runs against stale data
+        if (!deckHands[id]) batch.push(fsSet("deckHands", id, { id, day, type:"prep",    task }));
       });
       CLEAN.forEach((task, i) => {
         const id = `clean_${day.replace(" ","")}${i}`;
-        if (!deckHands[id]) batch.push(fsSet("deckHands", id, { id, day, type:"cleanup", task, claimedBy:null, claimedByName:"" }));
+        if (!deckHands[id]) batch.push(fsSet("deckHands", id, { id, day, type:"cleanup", task }));
       });
     });
     await Promise.all(batch);
@@ -2636,7 +2642,7 @@ export default function App(){
     doSaveFood,doDelFood,doSaveSupply,doDelSupply,
     doSaveMenuItem,doDelMenuItem,doClaimSlot,doUnclaimSlot,doInitDeckHands,
     doSaveReceipt,doDelReceipt,
-    doSaveItinDay,doDelItinDay,doSaveDeckSlot,doDelDeckSlot,doSetDeposit,doSetRank,isAdmin,canUseEngineRoom,usersReady,doSetAdmin,doSendNotification,doSaveCostSettings,costSettings,doSaveItinMeta,itinMeta,doAssignNarrativeRole,suspectScores,doRecordSuspectCheck,missionClaims,doSubmitMissionClaim,doReviewMissionClaim,doForgiveClaimAttempt,teamOutcome:outcome,teamSettings,doSaveTeamSettings,doResetOnboarding,
+    doSaveItinDay,doDelItinDay,doSaveDeckSlot,doDelDeckSlot,deckHandsLoaded,doSetDeposit,doSetRank,isAdmin,canUseEngineRoom,usersReady,doSetAdmin,doSendNotification,doSaveCostSettings,costSettings,doSaveItinMeta,itinMeta,doAssignNarrativeRole,suspectScores,doRecordSuspectCheck,missionClaims,doSubmitMissionClaim,doReviewMissionClaim,doForgiveClaimAttempt,teamOutcome:outcome,teamSettings,doSaveTeamSettings,doResetOnboarding,
     notifPerm,notifSupported,requestPermission};
 
   return <>
@@ -4735,17 +4741,20 @@ export function Itinerary({ctx}){
 
 export function DeckHands({ctx}){
   const {deckHands,users,authUser,profile,doClaimSlot,doUnclaimSlot,doInitDeckHands,viewSection}=ctx; // users already destructured
+  const loaded = ctx.deckHandsLoaded !== false; // (a ctx that doesn't say is taken to be loaded)
   const [initialised,setInitialised]=useState(false);
   const [initing,setIniting]=useState(false);
   const [activeDay,setActiveDay]=useState("Nov 26");
 
-  // Auto-init slots if none exist yet
+  // Set up the default slots only when the server has said there are none. Before its first reply the list is just the empty
+  // starting value, and "setting up" then would overwrite everyone's sign-ups.
   useEffect(()=>{
+    if(!loaded) return;
     if(!initialised&&Object.keys(deckHands).length===0&&!initing){
       setIniting(true);
       doInitDeckHands().then(()=>{ setInitialised(true); setIniting(false); });
     } else if(Object.keys(deckHands).length>0) setInitialised(true);
-  },[deckHands]);
+  },[deckHands,loaded]);
 
   // Arriving from a link to a section (the Bridge's Crew and Open Duties cards): scroll to it once the page has rendered
   useEffect(()=>{
@@ -4766,6 +4775,7 @@ export function DeckHands({ctx}){
   const daysWithSlots = COTTAGE_DAYS.filter(d=>Object.values(deckHands).some(s=>s.day===d.short));
   const shownDay = daysWithSlots.some(d=>d.short===activeDay) ? activeDay : (daysWithSlots[0]?.short ?? activeDay);
 
+  if(!loaded) return <div className="cc-fade"><SectionTitle>Deck Hands</SectionTitle><Spinner label="Loading the roster…"/></div>;
   if(initing) return <div className="cc-fade"><SectionTitle>Deck Hands</SectionTitle><Spinner label="Preparing the roster…"/></div>;
 
   const uList = Object.values(users);

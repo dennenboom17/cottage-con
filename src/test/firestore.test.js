@@ -38,7 +38,7 @@ describe('subCol', () => {
 
     onNext(snapshotOf({ a: { name: 'Azul' }, b: { name: 'Catan' } }))
 
-    expect(set).toHaveBeenCalledWith({ a: { name: 'Azul' }, b: { name: 'Catan' } })
+    expect(set).toHaveBeenCalledWith({ a: { name: 'Azul' }, b: { name: 'Catan' } }, undefined)
   })
 
   it('replaces (not merges) state on each snapshot, so deleted docs disappear', () => {
@@ -49,13 +49,22 @@ describe('subCol', () => {
     onNext(snapshotOf({ a: { n: 1 }, b: { n: 2 } }))
     onNext(snapshotOf({ b: { n: 2 } }))
 
-    expect(set).toHaveBeenLastCalledWith({ b: { n: 2 } })
+    expect(set).toHaveBeenLastCalledWith({ b: { n: 2 } }, undefined)
   })
 
   it('handles an empty collection', () => {
     const set = vi.fn()
     subCol('games', set)
     onSnapshot.mock.calls.at(-1)[1](snapshotOf({}))
-    expect(set).toHaveBeenCalledWith({})
+    expect(set).toHaveBeenCalledWith({}, undefined)
+  })
+
+  it('hands the snapshot metadata to the setter, so a caller can tell a server answer from a cached one', () => {
+    const set = vi.fn()
+    subCol('deckHands', set)
+    const onNext = onSnapshot.mock.calls.at(-1)[1]
+    onNext({ ...snapshotOf({}), metadata: { fromCache: true } })
+    onNext({ ...snapshotOf({}), metadata: { fromCache: false } })
+    expect(set.mock.calls.map(([, meta]) => meta.fromCache)).toEqual([true, false])
   })
 })

@@ -4,6 +4,7 @@ import { render, screen, within, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { getDoc } from 'firebase/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
+import { onSnapshot } from 'firebase/firestore'
 import App, { DeckHands, Dashboard, parseHash, viewFromHash, sectionFromHash, validSection, writeViewHash, VIEW_SECTIONS } from '../App.jsx'
 
 vi.setConfig({ testTimeout: 20000 })
@@ -158,11 +159,15 @@ describe('end to end in the app', () => {
   const me = { uid: 'me', email: 'mia@example.com', emailVerified: true, displayName: 'Mia' }
   const profile = { id: 'me', name: 'Mia', email: 'mia@example.com', onboarded: true, crewRank: 'Enlisted', loginHistory: [] }
 
+  const snapshot = (docs) => ({ forEach: (fn) => Object.entries(docs).forEach(([id, data]) => fn({ id, data: () => data })), docChanges: () => [] })
   async function openApp() {
     onAuthStateChanged.mockImplementation((_a, cb) => { cb(me); return () => {} })
     getDoc.mockResolvedValue({ exists: () => true, data: () => profile })
     render(<App />)
     await screen.findByRole('navigation', { name: 'Main' })
+    // the server answers with the duty slots (Deck Hands waits for that before showing anything)
+    await vi.waitFor(() => expect(onSnapshot.mock.calls.find(([ref]) => ref.name === 'deckHands')?.[1]).toBeTypeOf('function'))
+    act(() => onSnapshot.mock.calls.find(([ref]) => ref.name === 'deckHands')[1](snapshot({ a: { id: 'a', day: 'Nov 26', type: 'prep', task: 'Task', claimedBy: null } })))
     return userEvent.setup()
   }
   const tile = (label) => screen.getByText(label).parentElement
