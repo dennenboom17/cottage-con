@@ -1543,7 +1543,7 @@ export function Avatar({name="?",picture,size=72}){
   return <div style={{width:size,height:size,borderRadius:"50%",background:avColor(name),display:"flex",alignItems:"center",justifyContent:"center",color:T.text,fontSize:size*.36,fontWeight:700,border:`2px solid ${T.border2}`,flexShrink:0}}>{getInitials(name)}</div>;
 }
 
-export function Btn({children,variant="primary",size="md",style={},disabled,onClick}){
+export function Btn({children,variant="primary",size="md",style={},disabled,onClick,ariaLabel}){
   const V={
     primary: {background:`linear-gradient(135deg,${T.amber},${T.amberGlow})`,color:"#111827",border:"none",boxShadow:`0 2px 12px ${T.amber}44`},
     ghost:   {background:"transparent",color:T.text,border:`2px solid ${T.border2}`},
@@ -1551,7 +1551,7 @@ export function Btn({children,variant="primary",size="md",style={},disabled,onCl
     danger:  {background:"transparent",color:T.danger,border:`1.5px solid ${T.danger}55`},
   };
   const S={sm:{fontSize:12,padding:"5px 12px"},md:{fontSize:14,padding:"9px 20px"},lg:{fontSize:15,padding:"11px 24px"}};
-  return <button disabled={disabled} onClick={onClick}
+  return <button disabled={disabled} onClick={onClick} aria-label={ariaLabel}
     style={{fontFamily:"'Cinzel',serif",fontWeight:600,borderRadius:6,cursor:disabled?"not-allowed":"pointer",transition:"all .15s",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:6,opacity:disabled?.5:1,letterSpacing:".03em",...S[size],...V[variant],...style}}>
     {children}
   </button>;
@@ -2626,6 +2626,30 @@ export default function App(){
     showToast(value ? "Admin access granted." : "Admin access removed.");
   };
 
+  // Remove a crew member — admins only (strictly: the open-Engine-Room bootstrap grants no removal rights), never yourself.
+  // Frees their duty sign-ups and drops their suspect-board score first; the user doc goes last, so a failure leaves them in
+  // place. What they added (games, provisions, gear, receipts) stays. Their sign-in account is not touched: signing in again
+  // starts the setup screen from scratch.
+  const doRemoveCrew = async userId => {
+    const target = users[userId];
+    if(!isAdmin || !target) return false;
+    if(userId===authUser?.uid){ showToast("You can't remove yourself."); return false; }
+    if(target.isAdmin && Object.values(users).filter(u=>u?.isAdmin).length<2){ showToast("There must be at least one admin."); return false; }
+    try{
+      await Promise.allSettled([
+        ...Object.values(deckHands).filter(sl=>sl?.claimedBy===userId).map(sl=>fsSet("deckHands", sl.id, {claimedBy:null, claimedByName:""})),
+        fsDel("suspectScores", userId),
+      ]);
+      await fsDel("users", userId);
+      showToast(`${target.name||"Crew member"} removed from the crew.`);
+      return true;
+    }catch(e){
+      console.error("[crew] remove failed:", e);
+      showToast("⚠️ Couldn't remove that crew member. Check your connection and try again.");
+      return false;
+    }
+  };
+
   // Crew rank — engine room override (users can also set their own in Personal Log)
   const doSetRank = async (userId, rank) => {
     const userDoc = users[userId];
@@ -2642,7 +2666,7 @@ export default function App(){
     doSaveFood,doDelFood,doSaveSupply,doDelSupply,
     doSaveMenuItem,doDelMenuItem,doClaimSlot,doUnclaimSlot,doInitDeckHands,
     doSaveReceipt,doDelReceipt,
-    doSaveItinDay,doDelItinDay,doSaveDeckSlot,doDelDeckSlot,deckHandsLoaded,doSetDeposit,doSetRank,isAdmin,canUseEngineRoom,usersReady,doSetAdmin,doSendNotification,doSaveCostSettings,costSettings,doSaveItinMeta,itinMeta,doAssignNarrativeRole,suspectScores,doRecordSuspectCheck,missionClaims,doSubmitMissionClaim,doReviewMissionClaim,doForgiveClaimAttempt,teamOutcome:outcome,teamSettings,doSaveTeamSettings,doResetOnboarding,
+    doSaveItinDay,doDelItinDay,doSaveDeckSlot,doDelDeckSlot,deckHandsLoaded,doSetDeposit,doSetRank,isAdmin,canUseEngineRoom,usersReady,doSetAdmin,doRemoveCrew,doSendNotification,doSaveCostSettings,costSettings,doSaveItinMeta,itinMeta,doAssignNarrativeRole,suspectScores,doRecordSuspectCheck,missionClaims,doSubmitMissionClaim,doReviewMissionClaim,doForgiveClaimAttempt,teamOutcome:outcome,teamSettings,doSaveTeamSettings,doResetOnboarding,
     notifPerm,notifSupported,requestPermission};
 
   return <>
@@ -6533,7 +6557,19 @@ function DepositManager({ctx}){
 
 // ── Crew Rank Manager (Engine Room only) ─────────────────────────────────────
 function CrewRankManager({ctx}){
-  const {users, doSetRank, doSetAdmin, authUser} = ctx;
+  const {users, doSetRank, doSetAdmin, doRemoveCrew, isAdmin, authUser} = ctx;
+  // Removing someone takes two confirmations: step 1 asks "are you sure", step 2 asks for their name typed out.
+  const [removal, setRemoval] = useState(null); // {id, step: 1|2}
+  const [typed, setTyped] = useState("");
+  const [removing, setRemoving] = useState(false);
+  const cancelRemoval = () => { setRemoval(null); setTyped(""); };
+  const confirmWord = u => (u.name||"").trim() || "REMOVE";
+  const removeNow = async u => {
+    setRemoving(true);
+    const ok = await doRemoveCrew(u.id);
+    setRemoving(false);
+    if(ok) cancelRemoval();
+  };
   const uList = Object.values(users).sort((a,b)=>(a.name||"").localeCompare(b.name||""));
 
   // Summary counts
@@ -6601,6 +6637,38 @@ function CrewRankManager({ctx}){
                   );
                 })}
               </div>
+              {/* Remove from the crew (admins only; never yourself) */}
+              {isAdmin&&u.id!==authUser?.uid&&!removal&&(
+                <Btn size="sm" variant="danger" ariaLabel={`Remove ${u.name||"crew member"}`} onClick={()=>{ setRemoval({id:u.id, step:1}); setTyped(""); }}>
+                  <i className="ti ti-user-minus"/> Remove
+                </Btn>
+              )}
+              {removal?.id===u.id&&(
+                <div role="alertdialog" aria-label={`Remove ${u.name||"crew member"}`}
+                  style={{flexBasis:"100%",border:`1.5px solid ${T.danger}55`,background:T.dangerBg,borderRadius:6,padding:"12px 14px"}}>
+                  {removal.step===1?<>
+                    <div style={{fontSize:12,color:T.text,marginBottom:10,lineHeight:1.5}}>
+                      Remove <strong>{u.name||"this crew member"}</strong> from the crew? They lose their rank, role and
+                      leaderboard score, and their duty sign-ups are freed. What they added (games, provisions, gear, receipts) stays.
+                    </div>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      <Btn size="sm" variant="danger" onClick={()=>setRemoval({id:u.id, step:2})}>Yes, continue</Btn>
+                      <Btn size="sm" variant="ghost" onClick={cancelRemoval}>Cancel</Btn>
+                    </div>
+                  </>:<>
+                    <div style={{fontSize:12,color:T.text,marginBottom:10,lineHeight:1.5}}>
+                      Final check: this can't be undone. Type <strong>{confirmWord(u)}</strong> to remove them for good.
+                    </div>
+                    <Inp aria-label={`Type ${confirmWord(u)} to confirm`} value={typed} autoFocus autoComplete="off"
+                      onChange={e=>setTyped(e.target.value)} placeholder={confirmWord(u)} containerStyle={{marginBottom:10,maxWidth:260}}/>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      <Btn size="sm" variant="danger" disabled={removing||typed.trim().toLowerCase()!==confirmWord(u).toLowerCase()}
+                        onClick={()=>removeNow(u)}>{removing?"Removing…":"Remove for good"}</Btn>
+                      <Btn size="sm" variant="ghost" disabled={removing} onClick={cancelRemoval}>Cancel</Btn>
+                    </div>
+                  </>}
+                </div>
+              )}
             </div>
           );
         })}
